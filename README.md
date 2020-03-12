@@ -34,16 +34,16 @@ For the most common pairs of values - `&str` and `String`, or `&[u8]` and `Vec<u
 means that the entire enum is 4 words wide:
 
 ```text
-	 									     Padding
-											    |
-												v
-	      +----------+----------+----------+----------+
+                                             Padding
+                                                |
+                                                v
+          +----------+----------+----------+----------+
 Borrowed: | Tag      | Pointer  | Length   | XXXXXXXX |
-	      +----------+----------+----------+----------+
+          +----------+----------+----------+----------+
 
-		  +----------+----------+----------+----------+
+          +----------+----------+----------+----------+
 Owned:    | Tag      | Pointer  | Length   | Capacity |
-		  +----------+----------+----------+----------+
+          +----------+----------+----------+----------+
 ```
 
 Instead of being an enum with a tag, `beef::Cow` uses capacity to determine whether the
