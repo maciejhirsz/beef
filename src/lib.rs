@@ -22,7 +22,9 @@
 use std::borrow::{Borrow, ToOwned};
 use std::fmt;
 use std::num::NonZeroUsize;
+use std::hash::{Hash, Hasher};
 
+#[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a> {
     inner: &'a T,
     capacity: Option<NonZeroUsize>,
@@ -78,7 +80,10 @@ where
     }
 }
 
-impl<'a, T: Beef + ?Sized> Cow<'a, T> {
+impl<'a, T> Cow<'a, T>
+where
+    T: Beef + ?Sized,
+{
     // This can be made const fn in the future:
     // https://github.com/rust-lang/rust/issues/57563
     #[inline]
@@ -102,6 +107,16 @@ impl<'a, T: Beef + ?Sized> Cow<'a, T> {
         } else {
             inner.to_owned()
         }
+    }
+}
+
+impl<T> Hash for Cow<'_, T>
+where
+    T: Hash + Beef + ?Sized,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state)
     }
 }
 
@@ -177,9 +192,20 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &T {
-        &self.inner
+        self.inner
     }
 }
+
+impl<T> Borrow<T> for Cow<'_, T>
+where
+    T: Beef + ?Sized,
+{
+    #[inline]
+    fn borrow(&self) -> &T {
+        self.inner
+    }
+}
+
 
 impl<T, U> PartialEq<U> for Cow<'_, T>
 where
@@ -320,5 +346,43 @@ mod tests {
 
         assert_eq!(borrowed.into_owned(), hello);
         assert_eq!(owned.into_owned(), hello);
+    }
+
+    #[test]
+    fn hash() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let slice = "Hello World!";
+        let borrowed = Cow::borrowed(slice);
+        let owned: Cow<str> = Cow::owned(slice.to_owned());
+
+        let hash1 = {
+            let mut hasher = DefaultHasher::default();
+
+            slice.hash(&mut hasher);
+
+            hasher.finish()
+        };
+
+        let hash2 = {
+            let mut hasher = DefaultHasher::default();
+
+            borrowed.hash(&mut hasher);
+
+            hasher.finish()
+        };
+
+        let hash3 = {
+            let mut hasher = DefaultHasher::default();
+
+            owned.hash(&mut hasher);
+
+            hasher.finish()
+        };
+
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1, hash3);
+        assert_eq!(hash2, hash3);
     }
 }
