@@ -19,7 +19,7 @@
 //! # }
 //! ```
 
-use std::borrow::{Borrow, ToOwned};
+use std::borrow::{Borrow, ToOwned, Cow as StdCow};
 use std::fmt;
 use std::num::NonZeroUsize;
 use std::hash::{Hash, Hasher};
@@ -100,12 +100,11 @@ where
 
         std::mem::forget(self);
 
-        if let Some(capacity) = capacity {
-            unsafe {
+        match capacity {
+            Some(capacity) => unsafe {
                 inner.rebuild(capacity.get())
-            }
-        } else {
-            inner.to_owned()
+            },
+            None => inner.to_owned(),
         }
     }
 }
@@ -165,11 +164,11 @@ impl<'a, T> Clone for Cow<'a, T>
 where
     T: Beef + ?Sized,
 {
+    #[inline]
     fn clone(&self) -> Self {
-        if self.capacity.is_some() {
-            Cow::owned(self.inner.to_owned())
-        } else {
-            Cow { ..*self }
+        match self.capacity {
+            Some(_) => Cow::owned(self.inner.to_owned()),
+            None => Cow { ..*self }
         }
     }
 }
@@ -203,6 +202,38 @@ where
     #[inline]
     fn borrow(&self) -> &T {
         self.inner
+    }
+}
+
+impl<'a, T> From<StdCow<'a, T>> for Cow<'a, T>
+where
+    T: Beef + ?Sized,
+{
+    #[inline]
+    fn from(stdcow: StdCow<'a, T>) -> Self {
+        match stdcow {
+            StdCow::Borrowed(v) => Self::borrowed(v),
+            StdCow::Owned(v) => Self::owned(v),
+        }
+    }
+}
+
+impl<'a, T> From<Cow<'a, T>> for StdCow<'a, T>
+where
+    T: Beef + ?Sized,
+{
+    #[inline]
+    fn from(cow: Cow<'a, T>) -> Self {
+        let Cow { inner, capacity } = cow;
+
+        std::mem::forget(cow);
+
+        match capacity {
+            Some(capacity) => StdCow::Owned(unsafe {
+                inner.rebuild(capacity.get())
+            }),
+            None => StdCow::Borrowed(inner),
+        }
     }
 }
 
