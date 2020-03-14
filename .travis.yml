@@ -1,8 +1,16 @@
 language: rust
-rust:
-  - stable
-  - beta
-  - nightly
+
+matrix:
+  include:
+    - rust: stable
+    - rust: beta
+    - rust: nightly
+    - rust: stable
+      name: "no_std stable"
+      install:
+        - rustup target add thumbv6m-none-eabi
+      script:
+        - cargo build --target thumbv6m-none-eabi --verbose
 jobs:
   allow_failures:
     - rust: nightly

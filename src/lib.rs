@@ -25,7 +25,6 @@
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
 #![cfg_attr(not(test), no_std)]
-
 extern crate alloc;
 
 use alloc::borrow::{Borrow, Cow as StdCow, ToOwned};
@@ -489,5 +488,13 @@ mod tests {
         assert_eq!(hash1, hash2);
         assert_eq!(hash1, hash3);
         assert_eq!(hash2, hash3);
+    }
+
+    #[test]
+    fn from_std_cow() {
+        let std = std::borrow::Cow::Borrowed("Hello World");
+        let beef = Cow::from(std.clone());
+
+        assert_eq!(&*std, &*beef);
     }
 }
