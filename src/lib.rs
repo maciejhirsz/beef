@@ -344,6 +344,7 @@ impl<T: Beef + fmt::Display + ?Sized> fmt::Display for Cow<'_, T> {
 }
 
 unsafe impl<T: Beef + Sync + ?Sized> Sync for Cow<'_, T> {}
+unsafe impl<T: Beef + Send + ?Sized> Send for Cow<'_, T> {}
 
 #[cfg(test)]
 mod tests {
