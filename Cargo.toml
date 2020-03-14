@@ -9,7 +9,7 @@ documentation = "https://docs.rs/json/"
 license = "MIT/Apache-2.0"
 readme = "./README.md"
 keywords = ["cow", "borrow", "str", "slice"]
-categories = ["memory-management"]
+categories = ["no-std", "memory-management"]
 
 [features]
 default = []
