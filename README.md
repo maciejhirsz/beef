@@ -1,6 +1,15 @@
 # beef
 
+[![Travis shield](https://travis-ci.org/maciejhirsz/beef.svg)](https://travis-ci.org/maciejhirsz/beef)
+[![Crates.io version shield](https://img.shields.io/crates/v/beef.svg)](https://crates.io/crates/beef)
+[![Crates.io license shield](https://img.shields.io/crates/l/beef.svg)](https://crates.io/crates/beef)
+
 Alternative implementation of `Cow` that's more compact in memory.
+
+**[Changelog](https://github.com/maciejhirsz/beef/releases) -**
+**[Documentation](https://docs.rs/beef/) -**
+**[Cargo](https://crates.io/crates/beef) -**
+**[Repository](https://github.com/maciejhirsz/beef)**
 
 ```rust
 use beef::Cow;
@@ -48,3 +57,10 @@ Owned:    | Tag      | Pointer  | Length   | Capacity |
 
 Instead of being an enum with a tag, `beef::Cow` uses capacity to determine whether the
 value it's holding is owned (capacity is greater than 0), or borrowed (capacity is 0).
+
+## License
+
+This crate is distributed under the terms of both the MIT license
+and the Apache License (Version 2.0). Choose whichever one works best for you.
+
+See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.
