@@ -74,11 +74,12 @@ unsafe impl Beef for str {
 
     #[inline]
     unsafe fn owned_ptr(mut owned: String) -> NonNull<str> {
-        let ptr = owned.as_mut_str() as *mut str;
+        let ptr = owned.as_mut_ptr();
+        let len = owned.len();
 
         mem::forget(owned);
 
-        NonNull::new_unchecked(ptr)
+        NonNull::new_unchecked(slice_from_raw_parts_mut(ptr, len) as *mut str)
     }
 
     #[inline]
