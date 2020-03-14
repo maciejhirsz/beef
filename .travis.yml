@@ -3,6 +3,12 @@ rust:
   - stable
   - beta
   - nightly
+  - stable
+    name: "no_std"
+    install:
+      - rustup target add thumbv6m-none-eabi
+    script:
+      - cargo build --target thumbv6m-none-eabi --verbose
 jobs:
   allow_failures:
     - rust: nightly
