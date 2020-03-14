@@ -6,7 +6,7 @@ matrix:
     - rust: beta
     - rust: nightly
     - rust: stable
-      name: "Linux, stable"
+      name: "no_std stable"
       install:
         - rustup target add thumbv6m-none-eabi
       script:
