@@ -54,72 +54,63 @@ pub struct Cow<'a, T: Beef + ?Sized + 'a> {
 /// + `T::Owned` with `capacity` of `0` does not allocate memory.
 /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
 pub unsafe trait Beef: ToOwned {
-    /// Get capacity of owned variant of `T`. Return `None` for `0`.
-    /// Returning invalid capacity will lead to undefined behavior.
-    fn capacity(owned: &Self::Owned) -> Option<NonZeroUsize>;
-
-    /// Convert `T::Owned` to `NonNull<T>`.
-    fn owned_ptr(owned: Self::Owned) -> NonNull<Self>;
+    /// Convert `T::Owned` to `NonNull<T>` and capacity.
+    /// Return `None` for `0` capacity.
+    fn owned_into_parts(owned: Self::Owned) -> (NonNull<Self>, Option<NonZeroUsize>);
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
-    unsafe fn rebuild(ptr: NonNull<Self>, capacity: usize) -> Self::Owned;
+    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> Self::Owned;
 }
 
 unsafe impl Beef for str {
     #[inline]
-    fn capacity(owned: &String) -> Option<NonZeroUsize> {
-        NonZeroUsize::new(owned.capacity())
-    }
-
-    #[inline]
-    fn owned_ptr(owned: String) -> NonNull<str> {
+    fn owned_into_parts(owned: String) -> (NonNull<str>, Option<NonZeroUsize>) {
+        // Convert to `String::into_raw_parts` once stabilized
         let mut owned = mem::ManuallyDrop::new(owned);
         let ptr = slice_from_raw_parts_mut(
             owned.as_mut_ptr(),
             owned.len(),
         );
 
-        unsafe {
-            NonNull::new_unchecked(ptr as *mut str)
-        }
+        (
+            unsafe { NonNull::new_unchecked(ptr as *mut str) },
+            NonZeroUsize::new(owned.capacity()),
+        )
     }
 
     #[inline]
-    unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> String {
+    unsafe fn owned_from_parts(mut ptr: NonNull<Self>, capacity: NonZeroUsize) -> String {
         String::from_utf8_unchecked(Vec::from_raw_parts(
             ptr.as_mut().as_mut_ptr(),
             ptr.as_mut().len(),
-            capacity,
+            capacity.get(),
         ))
     }
 }
 
 unsafe impl<T: Clone> Beef for [T] {
     #[inline]
-    fn capacity(owned: &Vec<T>) -> Option<NonZeroUsize> {
-        NonZeroUsize::new(owned.capacity())
-    }
-
-    #[inline]
-    fn owned_ptr(owned: Vec<T>) -> NonNull<[T]> {
+    fn owned_into_parts(owned: Vec<T>) -> (NonNull<[T]>, Option<NonZeroUsize>) {
+        // Convert to `Vec::into_raw_parts` once stabilized
         let mut owned = mem::ManuallyDrop::new(owned);
         let ptr = slice_from_raw_parts_mut(
             owned.as_mut_ptr(),
             owned.len(),
         );
 
-        unsafe {
-            NonNull::new_unchecked(ptr)
-        }
+        (
+            unsafe { NonNull::new_unchecked(ptr) },
+            NonZeroUsize::new(owned.capacity()),
+        )
     }
 
     #[inline]
-    unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> Vec<T> {
+    unsafe fn owned_from_parts(mut ptr: NonNull<Self>, capacity: NonZeroUsize) -> Vec<T> {
         Vec::from_raw_parts(
             ptr.as_mut().as_mut_ptr(),
             ptr.as_mut().len(),
-            capacity,
+            capacity.get(),
         )
     }
 }
@@ -131,8 +122,7 @@ where
     /// Owned data.
     #[inline]
     pub fn owned(val: B::Owned) -> Self {
-        let capacity = B::capacity(&val);
-        let inner = B::owned_ptr(val);
+        let (inner, capacity) = B::owned_into_parts(val);
 
         Cow {
             inner,
@@ -186,7 +176,7 @@ where
         let cow = mem::ManuallyDrop::new(self);
 
         match cow.capacity {
-            Some(capacity) => unsafe { T::rebuild(cow.inner, capacity.get()) },
+            Some(capacity) => unsafe { T::owned_from_parts(cow.inner, capacity) },
             None => unsafe { cow.inner.as_ref() }.to_owned(),
         }
     }
@@ -242,7 +232,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity {
-            mem::drop(unsafe { T::rebuild(self.inner, capacity.get()) });
+            mem::drop(unsafe { T::owned_from_parts(self.inner, capacity) });
         }
     }
 }
@@ -318,7 +308,7 @@ where
         mem::forget(cow);
 
         match capacity {
-            Some(capacity) => StdCow::Owned(unsafe { T::rebuild(inner, capacity.get()) }),
+            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(inner, capacity) }),
             None => StdCow::Borrowed(unsafe { &*inner.as_ptr() }),
         }
     }
