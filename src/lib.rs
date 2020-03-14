@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
+
 //! # beef
 //!
 //! Alternative implementation of `Cow` that's more compact in memory.
@@ -100,8 +102,23 @@ impl<'a, T> Cow<'a, T>
 where
     T: Beef + ?Sized,
 {
-    // This can be made const fn in the future:
+    // This requires nightly:
     // https://github.com/rust-lang/rust/issues/57563
+    #[cfg(feature = "const_fn")]
+    #[inline]
+    pub const fn borrowed(val: &'a T) -> Self {
+        Cow {
+            // A note on soundness:
+            //
+            // We are casting *const T to *mut T, however for all borrowed values
+            // this raw pointer is only ever dereferenced back to &T.
+            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
+            capacity: None,
+            marker: PhantomData,
+        }
+    }
+
+    #[cfg(not(feature = "const_fn"))]
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
         Cow {
