@@ -80,10 +80,12 @@ unsafe impl Beef for str {
     }
 
     #[inline]
-    unsafe fn owned_from_parts(mut ptr: NonNull<Self>, capacity: NonZeroUsize) -> String {
+    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> String {
+        let len = ptr.as_ref().len();
+
         String::from_utf8_unchecked(Vec::from_raw_parts(
-            ptr.as_mut().as_mut_ptr(),
-            ptr.as_mut().len(),
+            ptr.cast().as_ptr(),
+            len,
             capacity.get(),
         ))
     }
@@ -106,10 +108,12 @@ unsafe impl<T: Clone> Beef for [T] {
     }
 
     #[inline]
-    unsafe fn owned_from_parts(mut ptr: NonNull<Self>, capacity: NonZeroUsize) -> Vec<T> {
+    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> Vec<T> {
+        let len = ptr.as_ref().len();
+
         Vec::from_raw_parts(
-            ptr.as_mut().as_mut_ptr(),
-            ptr.as_mut().len(),
+            ptr.cast().as_ptr(),
+            len,
             capacity.get(),
         )
     }
