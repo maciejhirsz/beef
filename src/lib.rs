@@ -1,8 +1,10 @@
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
-
 //! # beef
 //!
 //! Alternative implementation of `Cow` that's more compact in memory.
+//!
+//! **[Changelog](https://github.com/maciejhirsz/beef/releases) -**
+//! **[Cargo](https://crates.io/crates/beef) -**
+//! **[Repository](https://github.com/maciejhirsz/beef)**
 //!
 //! ```rust
 //! # fn main() {
@@ -20,6 +22,8 @@
 //! assert!(std::mem::size_of::<Cow<str>>() < std::mem::size_of::<std::borrow::Cow<str>>());
 //! # }
 //! ```
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
+#![warn(missing_docs)]
 
 use std::borrow::{Borrow, ToOwned, Cow as StdCow};
 use std::fmt;
@@ -28,6 +32,7 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
+/// A clone-on-write smart pointer, mostly copatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a> {
     inner: NonNull<T>,
@@ -35,11 +40,24 @@ pub struct Cow<'a, T: Beef + ?Sized + 'a> {
     marker: PhantomData<&'a T>,
 }
 
+/// Helper trait required by `Cow<T>` to extract capacity of owned
+/// variant of `T`, and manage conversions.
+///
+/// This can be only implemented on types that match requirements:
+///
+/// + `T::Owned` has a `capacity`, which is an extra word that is absent in `T`.
+/// + `T::Owned` with `capacity` of `0` does not allocate memory.
+/// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
 pub unsafe trait Beef: ToOwned {
+    /// Get capacity of owned variant of `T`. Return `None` for `0`.
+    /// Returning invalid capacity will lead to undefined behavior.
     fn capacity(owned: &Self::Owned) -> Option<NonZeroUsize>;
 
+    /// Convert `&mut T::Owned` to `*mut T`, stripping `capacity`.
     unsafe fn owned_ptr(owned: &mut Self::Owned) -> NonNull<Self>;
 
+    /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
+    /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
     unsafe fn rebuild(ptr: NonNull<Self>, capacity: usize) -> Self::Owned;
 }
 
@@ -83,6 +101,7 @@ impl<B> Cow<'_, B>
 where
     B: Beef + ?Sized,
 {
+    /// Owned data.
     #[inline]
     pub fn owned(mut val: B::Owned) -> Self {
         let capacity = B::capacity(&val);
@@ -104,6 +123,7 @@ where
 {
     // This requires nightly:
     // https://github.com/rust-lang/rust/issues/57563
+    /// Owned data.
     #[cfg(feature = "const_fn")]
     #[inline]
     pub const fn borrowed(val: &'a T) -> Self {
@@ -118,6 +138,7 @@ where
         }
     }
 
+    /// Owned data.
     #[cfg(not(feature = "const_fn"))]
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
@@ -132,6 +153,9 @@ where
         }
     }
 
+    /// Extracts the owned data.
+    ///
+    /// Clones the data if it is not already owned.
     #[inline]
     pub fn into_owned(self) -> T::Owned {
         let Cow { inner, capacity, .. } = self;
@@ -146,6 +170,7 @@ where
         }
     }
 
+    /// Internal convenience method for casting `inner` into a `&T`
     #[inline]
     fn borrow(&self) -> &T {
         unsafe { self.inner.as_ref() }
