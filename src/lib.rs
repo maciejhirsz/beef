@@ -35,7 +35,7 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::mem;
 use core::num::NonZeroUsize;
-use core::ptr::NonNull;
+use core::ptr::{slice_from_raw_parts_mut, NonNull};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 #[derive(Eq)]
@@ -59,7 +59,7 @@ pub unsafe trait Beef: ToOwned {
     fn capacity(owned: &Self::Owned) -> Option<NonZeroUsize>;
 
     /// Convert `&mut T::Owned` to `*mut T`, stripping `capacity`.
-    unsafe fn owned_ptr(owned: &mut Self::Owned) -> NonNull<Self>;
+    unsafe fn owned_ptr(owned: Self::Owned) -> NonNull<Self>;
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
@@ -73,8 +73,12 @@ unsafe impl Beef for str {
     }
 
     #[inline]
-    unsafe fn owned_ptr(owned: &mut String) -> NonNull<str> {
-        NonNull::new_unchecked(owned.as_mut_str() as *mut str)
+    unsafe fn owned_ptr(mut owned: String) -> NonNull<str> {
+        let ptr = owned.as_mut_str() as *mut str;
+
+        mem::forget(owned);
+
+        NonNull::new_unchecked(ptr)
     }
 
     #[inline]
@@ -94,8 +98,13 @@ unsafe impl<T: Clone> Beef for [T] {
     }
 
     #[inline]
-    unsafe fn owned_ptr(owned: &mut Vec<T>) -> NonNull<[T]> {
-        NonNull::new_unchecked(owned.as_mut_slice() as *mut [T])
+    unsafe fn owned_ptr(mut owned: Vec<T>) -> NonNull<[T]> {
+        let ptr = owned.as_mut_ptr();
+        let len = owned.len();
+
+        mem::forget(owned);
+
+        NonNull::new_unchecked(slice_from_raw_parts_mut(ptr, len))
     }
 
     #[inline]
@@ -110,11 +119,9 @@ where
 {
     /// Owned data.
     #[inline]
-    pub fn owned(mut val: B::Owned) -> Self {
+    pub fn owned(val: B::Owned) -> Self {
         let capacity = B::capacity(&val);
-        let inner = unsafe { B::owned_ptr(&mut val) };
-
-        mem::forget(val);
+        let inner = unsafe { B::owned_ptr(val) };
 
         Cow {
             inner,
