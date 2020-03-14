@@ -24,15 +24,21 @@
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
+#![cfg_attr(not(test), no_std)]
 
-use std::borrow::{Borrow, ToOwned, Cow as StdCow};
-use std::fmt;
-use std::num::NonZeroUsize;
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::ptr::NonNull;
+extern crate alloc;
 
-/// A clone-on-write smart pointer, mostly copatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
+use alloc::borrow::{Borrow, Cow as StdCow, ToOwned};
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::mem;
+use core::num::NonZeroUsize;
+use core::ptr::NonNull;
+
+/// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a> {
     inner: NonNull<T>,
@@ -74,9 +80,11 @@ unsafe impl Beef for str {
 
     #[inline]
     unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> String {
-        String::from_utf8_unchecked(
-            Vec::from_raw_parts(ptr.as_mut().as_mut_ptr(), ptr.as_mut().len(), capacity)
-        )
+        String::from_utf8_unchecked(Vec::from_raw_parts(
+            ptr.as_mut().as_mut_ptr(),
+            ptr.as_mut().len(),
+            capacity,
+        ))
     }
 }
 
@@ -107,7 +115,7 @@ where
         let capacity = B::capacity(&val);
         let inner = unsafe { B::owned_ptr(&mut val) };
 
-        std::mem::forget(val);
+        mem::forget(val);
 
         Cow {
             inner,
@@ -158,14 +166,14 @@ where
     /// Clones the data if it is not already owned.
     #[inline]
     pub fn into_owned(self) -> T::Owned {
-        let Cow { inner, capacity, .. } = self;
+        let Cow {
+            inner, capacity, ..
+        } = self;
 
-        std::mem::forget(self);
+        mem::forget(self);
 
         match capacity {
-            Some(capacity) => unsafe {
-                T::rebuild(inner, capacity.get())
-            },
+            Some(capacity) => unsafe { T::rebuild(inner, capacity.get()) },
             None => unsafe { inner.as_ref() }.to_owned(),
         }
     }
@@ -221,9 +229,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity {
-            std::mem::drop(unsafe {
-                T::rebuild(self.inner, capacity.get())
-            });
+            mem::drop(unsafe { T::rebuild(self.inner, capacity.get()) });
         }
     }
 }
@@ -236,12 +242,12 @@ where
     fn clone(&self) -> Self {
         match self.capacity {
             Some(_) => Cow::owned(self.borrow().to_owned()),
-            None => Cow { ..*self }
+            None => Cow { ..*self },
         }
     }
 }
 
-impl<T> std::ops::Deref for Cow<'_, T>
+impl<T> core::ops::Deref for Cow<'_, T>
 where
     T: Beef + ?Sized,
 {
@@ -292,19 +298,18 @@ where
 {
     #[inline]
     fn from(cow: Cow<'a, T>) -> Self {
-        let Cow { inner, capacity, .. } = cow;
+        let Cow {
+            inner, capacity, ..
+        } = cow;
 
-        std::mem::forget(cow);
+        mem::forget(cow);
 
         match capacity {
-            Some(capacity) => StdCow::Owned(unsafe {
-                T::rebuild(inner, capacity.get())
-            }),
+            Some(capacity) => StdCow::Owned(unsafe { T::rebuild(inner, capacity.get()) }),
             None => StdCow::Borrowed(unsafe { &*inner.as_ptr() }),
         }
     }
 }
-
 
 impl<T, U> PartialEq<U> for Cow<'_, T>
 where
