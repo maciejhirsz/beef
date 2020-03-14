@@ -23,17 +23,22 @@ use std::borrow::{Borrow, ToOwned, Cow as StdCow};
 use std::fmt;
 use std::num::NonZeroUsize;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a> {
-    inner: &'a T,
+    inner: NonNull<T>,
     capacity: Option<NonZeroUsize>,
+    marker: PhantomData<&'a T>,
 }
 
 pub unsafe trait Beef: ToOwned {
     fn capacity(owned: &Self::Owned) -> Option<NonZeroUsize>;
 
-    unsafe fn rebuild(&self, capacity: usize) -> Self::Owned;
+    unsafe fn owned_ptr(owned: &mut Self::Owned) -> NonNull<Self>;
+
+    unsafe fn rebuild(ptr: NonNull<Self>, capacity: usize) -> Self::Owned;
 }
 
 unsafe impl Beef for str {
@@ -43,9 +48,14 @@ unsafe impl Beef for str {
     }
 
     #[inline]
-    unsafe fn rebuild(&self, capacity: usize) -> String {
+    unsafe fn owned_ptr(owned: &mut String) -> NonNull<str> {
+        NonNull::new_unchecked(owned.as_mut_str() as *mut str)
+    }
+
+    #[inline]
+    unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> String {
         String::from_utf8_unchecked(
-            Vec::from_raw_parts(self.as_ptr() as *mut u8, self.len(), capacity)
+            Vec::from_raw_parts(ptr.as_mut().as_mut_ptr(), ptr.as_mut().len(), capacity)
         )
     }
 }
@@ -57,8 +67,13 @@ unsafe impl<T: Clone> Beef for [T] {
     }
 
     #[inline]
-    unsafe fn rebuild(&self, capacity: usize) -> Vec<T> {
-        Vec::from_raw_parts(self.as_ptr() as *mut T, self.len(), capacity)
+    unsafe fn owned_ptr(owned: &mut Vec<T>) -> NonNull<[T]> {
+        NonNull::new_unchecked(owned.as_mut_slice() as *mut [T])
+    }
+
+    #[inline]
+    unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> Vec<T> {
+        Vec::from_raw_parts(ptr.as_mut().as_mut_ptr(), ptr.as_mut().len(), capacity)
     }
 }
 
@@ -67,15 +82,16 @@ where
     B: Beef + ?Sized,
 {
     #[inline]
-    pub fn owned(val: B::Owned) -> Self {
-        let inner = unsafe { &*(val.borrow() as *const B) };
+    pub fn owned(mut val: B::Owned) -> Self {
         let capacity = B::capacity(&val);
+        let inner = unsafe { B::owned_ptr(&mut val) };
 
         std::mem::forget(val);
 
         Cow {
             inner,
             capacity,
+            marker: PhantomData,
         }
     }
 }
@@ -89,23 +105,33 @@ where
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
         Cow {
-            inner: val,
+            // A note on soundness:
+            //
+            // We are casting *const T to *mut T, however for all borrowed values
+            // this raw pointer is only ever dereferenced back to &T.
+            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
             capacity: None,
+            marker: PhantomData,
         }
     }
 
     #[inline]
     pub fn into_owned(self) -> T::Owned {
-        let Cow { inner, capacity } = self;
+        let Cow { inner, capacity, .. } = self;
 
         std::mem::forget(self);
 
         match capacity {
             Some(capacity) => unsafe {
-                inner.rebuild(capacity.get())
+                T::rebuild(inner, capacity.get())
             },
-            None => inner.to_owned(),
+            None => unsafe { inner.as_ref() }.to_owned(),
         }
+    }
+
+    #[inline]
+    fn borrow(&self) -> &T {
+        unsafe { self.inner.as_ref() }
     }
 }
 
@@ -115,7 +141,7 @@ where
 {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner.hash(state)
+        self.borrow().hash(state)
     }
 }
 
@@ -154,7 +180,7 @@ where
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity {
             std::mem::drop(unsafe {
-                self.inner.rebuild(capacity.get())
+                T::rebuild(self.inner, capacity.get())
             });
         }
     }
@@ -167,7 +193,7 @@ where
     #[inline]
     fn clone(&self) -> Self {
         match self.capacity {
-            Some(_) => Cow::owned(self.inner.to_owned()),
+            Some(_) => Cow::owned(self.borrow().to_owned()),
             None => Cow { ..*self }
         }
     }
@@ -181,7 +207,7 @@ where
 
     #[inline]
     fn deref(&self) -> &T {
-        &self.inner
+        self.borrow()
     }
 }
 
@@ -191,7 +217,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &T {
-        self.inner
+        self.borrow()
     }
 }
 
@@ -201,7 +227,7 @@ where
 {
     #[inline]
     fn borrow(&self) -> &T {
-        self.inner
+        self.borrow()
     }
 }
 
@@ -224,15 +250,15 @@ where
 {
     #[inline]
     fn from(cow: Cow<'a, T>) -> Self {
-        let Cow { inner, capacity } = cow;
+        let Cow { inner, capacity, .. } = cow;
 
         std::mem::forget(cow);
 
         match capacity {
             Some(capacity) => StdCow::Owned(unsafe {
-                inner.rebuild(capacity.get())
+                T::rebuild(inner, capacity.get())
             }),
-            None => StdCow::Borrowed(inner),
+            None => StdCow::Borrowed(unsafe { &*inner.as_ptr() }),
         }
     }
 }
@@ -245,28 +271,28 @@ where
 {
     #[inline]
     fn eq(&self, other: &U) -> bool {
-        self.inner == other.as_ref()
+        self.borrow() == other.as_ref()
     }
 }
 
 impl PartialEq<Cow<'_, str>> for str {
     #[inline]
     fn eq(&self, other: &Cow<str>) -> bool {
-        self == other.inner
+        self == other.borrow()
     }
 }
 
 impl PartialEq<Cow<'_, str>> for &str {
     #[inline]
     fn eq(&self, other: &Cow<str>) -> bool {
-        *self == other.inner
+        *self == other.borrow()
     }
 }
 
 impl PartialEq<Cow<'_, str>> for String {
     #[inline]
     fn eq(&self, other: &Cow<str>) -> bool {
-        self == other.inner
+        self == other.borrow()
     }
 }
 
@@ -277,7 +303,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Cow<[T]>) -> bool {
-        self == other.inner
+        self == other.borrow()
     }
 }
 
@@ -288,7 +314,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Cow<[T]>) -> bool {
-        *self == other.inner
+        *self == other.borrow()
     }
 }
 
@@ -299,23 +325,25 @@ where
 {
     #[inline]
     fn eq(&self, other: &Cow<[T]>) -> bool {
-        &self[..] == other.inner
+        &self[..] == other.borrow()
     }
 }
 
 impl<T: Beef + fmt::Debug + ?Sized> fmt::Debug for Cow<'_, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.inner.fmt(f)
+        self.borrow().fmt(f)
     }
 }
 
 impl<T: Beef + fmt::Display + ?Sized> fmt::Display for Cow<'_, T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.inner.fmt(f)
+        self.borrow().fmt(f)
     }
 }
+
+unsafe impl<T: Beef + Sync + ?Sized> Sync for Cow<'_, T> {}
 
 #[cfg(test)]
 mod tests {
@@ -329,7 +357,6 @@ mod tests {
         assert_eq!(s, c);
         assert_eq!(s, c.as_ref());
         assert_eq!(s, &*c);
-        assert_eq!(s, c.inner);
     }
 
     #[test]
@@ -358,7 +385,6 @@ mod tests {
         assert_eq!(s, c);
         assert_eq!(s, c.as_ref());
         assert_eq!(s, &*c);
-        assert_eq!(s, c.inner);
     }
 
     #[test]
