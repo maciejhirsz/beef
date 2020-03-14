@@ -58,8 +58,8 @@ pub unsafe trait Beef: ToOwned {
     /// Returning invalid capacity will lead to undefined behavior.
     fn capacity(owned: &Self::Owned) -> Option<NonZeroUsize>;
 
-    /// Convert `&mut T::Owned` to `*mut T`, stripping `capacity`.
-    unsafe fn owned_ptr(owned: Self::Owned) -> NonNull<Self>;
+    /// Convert `T::Owned` to `NonNull<T>`.
+    fn owned_ptr(owned: Self::Owned) -> NonNull<Self>;
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
@@ -73,13 +73,16 @@ unsafe impl Beef for str {
     }
 
     #[inline]
-    unsafe fn owned_ptr(mut owned: String) -> NonNull<str> {
-        let ptr = owned.as_mut_ptr();
-        let len = owned.len();
+    fn owned_ptr(owned: String) -> NonNull<str> {
+        let mut owned = mem::ManuallyDrop::new(owned);
+        let ptr = slice_from_raw_parts_mut(
+            owned.as_mut_ptr(),
+            owned.len(),
+        );
 
-        mem::forget(owned);
-
-        NonNull::new_unchecked(slice_from_raw_parts_mut(ptr, len) as *mut str)
+        unsafe {
+            NonNull::new_unchecked(ptr as *mut str)
+        }
     }
 
     #[inline]
@@ -99,18 +102,25 @@ unsafe impl<T: Clone> Beef for [T] {
     }
 
     #[inline]
-    unsafe fn owned_ptr(mut owned: Vec<T>) -> NonNull<[T]> {
-        let ptr = owned.as_mut_ptr();
-        let len = owned.len();
+    fn owned_ptr(owned: Vec<T>) -> NonNull<[T]> {
+        let mut owned = mem::ManuallyDrop::new(owned);
+        let ptr = slice_from_raw_parts_mut(
+            owned.as_mut_ptr(),
+            owned.len(),
+        );
 
-        mem::forget(owned);
-
-        NonNull::new_unchecked(slice_from_raw_parts_mut(ptr, len))
+        unsafe {
+            NonNull::new_unchecked(ptr)
+        }
     }
 
     #[inline]
     unsafe fn rebuild(mut ptr: NonNull<Self>, capacity: usize) -> Vec<T> {
-        Vec::from_raw_parts(ptr.as_mut().as_mut_ptr(), ptr.as_mut().len(), capacity)
+        Vec::from_raw_parts(
+            ptr.as_mut().as_mut_ptr(),
+            ptr.as_mut().len(),
+            capacity,
+        )
     }
 }
 
@@ -122,7 +132,7 @@ where
     #[inline]
     pub fn owned(val: B::Owned) -> Self {
         let capacity = B::capacity(&val);
-        let inner = unsafe { B::owned_ptr(val) };
+        let inner = B::owned_ptr(val);
 
         Cow {
             inner,
