@@ -183,15 +183,11 @@ where
     /// Clones the data if it is not already owned.
     #[inline]
     pub fn into_owned(self) -> T::Owned {
-        let Cow {
-            inner, capacity, ..
-        } = self;
+        let cow = mem::ManuallyDrop::new(self);
 
-        mem::forget(self);
-
-        match capacity {
-            Some(capacity) => unsafe { T::rebuild(inner, capacity.get()) },
-            None => unsafe { inner.as_ref() }.to_owned(),
+        match cow.capacity {
+            Some(capacity) => unsafe { T::rebuild(cow.inner, capacity.get()) },
+            None => unsafe { cow.inner.as_ref() }.to_owned(),
         }
     }
 
