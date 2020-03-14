@@ -7,3 +7,10 @@ description = "More compact Cow"
 repository = "https://github.com/maciejhirsz/beef"
 documentation = "https://docs.rs/json/"
 license = "MIT/Apache-2.0"
+
+[features]
+default = []
+
+# makes `Cow::borrowed` a const fn
+# requires nightly: https://github.com/rust-lang/rust/issues/57563
+const_fn = []
