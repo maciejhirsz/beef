@@ -49,9 +49,13 @@ fn beef_as_ref(b: &mut Bencher) {
     }).collect();
 
     b.iter(|| {
-        let out: Vec<&str> = cow_words.iter().map(|cow| cow.as_ref()).collect();
+        for word in cow_words.iter() {
+            let word: &str = word.as_ref();
+            black_box(word);
+        }
+        // let out: Vec<&str> = cow_words.iter().map(|cow| cow.as_ref()).collect();
 
-        black_box(out)
+        // black_box(out)
     });
 }
 
@@ -94,8 +98,12 @@ fn std_as_ref(b: &mut Bencher) {
     }).collect();
 
     b.iter(|| {
-        let out: Vec<&str> = stdcow_words.iter().map(|stdcow| stdcow.as_ref()).collect();
+        for word in stdcow_words.iter() {
+            let word: &str = word.as_ref();
+            black_box(word);
+        }
+        // let out: Vec<&str> = stdcow_words.iter().map(|stdcow| stdcow.as_ref()).collect();
 
-        black_box(out)
+        // black_box(out)
     });
 }
