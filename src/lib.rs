@@ -33,7 +33,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
-use core::mem;
+use core::mem::ManuallyDrop;
 use core::num::NonZeroUsize;
 use core::ptr::{slice_from_raw_parts_mut, NonNull};
 
@@ -67,7 +67,7 @@ unsafe impl Beef for str {
     #[inline]
     fn owned_into_parts(owned: String) -> (NonNull<str>, Option<NonZeroUsize>) {
         // Convert to `String::into_raw_parts` once stabilized
-        let mut owned = mem::ManuallyDrop::new(owned);
+        let mut owned = ManuallyDrop::new(owned);
         let ptr = slice_from_raw_parts_mut(
             owned.as_mut_ptr(),
             owned.len(),
@@ -95,7 +95,7 @@ unsafe impl<T: Clone> Beef for [T] {
     #[inline]
     fn owned_into_parts(owned: Vec<T>) -> (NonNull<[T]>, Option<NonZeroUsize>) {
         // Convert to `Vec::into_raw_parts` once stabilized
-        let mut owned = mem::ManuallyDrop::new(owned);
+        let mut owned = ManuallyDrop::new(owned);
         let ptr = slice_from_raw_parts_mut(
             owned.as_mut_ptr(),
             owned.len(),
@@ -177,7 +177,7 @@ where
     /// Clones the data if it is not already owned.
     #[inline]
     pub fn into_owned(self) -> T::Owned {
-        let cow = mem::ManuallyDrop::new(self);
+        let cow = ManuallyDrop::new(self);
 
         match cow.capacity {
             Some(capacity) => unsafe { T::owned_from_parts(cow.inner, capacity) },
@@ -236,7 +236,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity {
-            mem::drop(unsafe { T::owned_from_parts(self.inner, capacity) });
+            unsafe { T::owned_from_parts(self.inner, capacity) };
         }
     }
 }
@@ -305,15 +305,11 @@ where
 {
     #[inline]
     fn from(cow: Cow<'a, T>) -> Self {
-        let Cow {
-            inner, capacity, ..
-        } = cow;
+        let cow = ManuallyDrop::new(cow);
 
-        mem::forget(cow);
-
-        match capacity {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(inner, capacity) }),
-            None => StdCow::Borrowed(unsafe { &*inner.as_ptr() }),
+        match cow.capacity {
+            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(cow.inner, capacity) }),
+            None => StdCow::Borrowed(unsafe { &*cow.inner.as_ptr() }),
         }
     }
 }
