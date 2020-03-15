@@ -19,4 +19,8 @@ default = []
 const_fn = []
 
 [profile.bench]
-lto = true
+opt-level = 3
+debug = false
+lto = 'fat'
+debug-assertions = false
+codegen-units = 1
