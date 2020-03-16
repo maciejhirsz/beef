@@ -1,3 +1,6 @@
+//! This module contains the actual, albeit generic, implementaiton of the `Cow`,
+//! and the traits that are available to it.
+
 use alloc::borrow::{Borrow, Cow as StdCow};
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -29,7 +32,7 @@ where
     /// # Example
     ///
     /// ```rust
-    ///	use beef::Cow;
+    /// use beef::Cow;
     ///
     /// let owned: Cow<str> = Cow::owned("I own my content".to_string());
     /// ```
@@ -55,13 +58,13 @@ where
     /// # Example
     ///
     /// ```rust
-    ///	use beef::Cow;
+    /// use beef::Cow;
     ///
     /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
     /// ```
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
-    	let (inner, capacity) = T::ref_into_parts(val);
+        let (inner, capacity) = T::ref_into_parts(val);
 
         Cow {
             inner,
@@ -90,7 +93,7 @@ where
     }
 
     fn capacity(&self) -> Option<U::NonZero> {
-    	U::maybe(T::len(self.inner.as_ptr()), self.capacity)
+        U::maybe(T::len(self.inner.as_ptr()), self.capacity)
     }
 }
 
@@ -118,7 +121,7 @@ where
 
 impl<U> From<String> for Cow<'_, str, U>
 where
-	U: Capacity,
+    U: Capacity,
 {
     #[inline]
     fn from(s: String) -> Self {
@@ -229,82 +232,52 @@ where
     }
 }
 
-impl<T, U, V> PartialEq<V> for Cow<'_, T, U>
+impl<A, B, U, V> PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
 where
-    T: Beef + PartialEq + ?Sized,
+    A: Beef + ?Sized,
+    B: Beef + ?Sized,
     U: Capacity,
-    V: AsRef<T> + ?Sized,
+    V: Capacity,
+    A: PartialEq<B>,
 {
-    #[inline]
-    fn eq(&self, other: &V) -> bool {
-        self.borrow() == other.as_ref()
+    fn eq(&self, other: &Cow<B, V>) -> bool {
+        self.borrow() == other.borrow()
     }
 }
 
-impl<U> PartialEq<Cow<'_, str, U>> for str
-where
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<str, U>) -> bool {
-        self == other.borrow()
-    }
+macro_rules! impl_eq {
+    ($($(@for< $bounds:tt >)? $inner:ty => $([$($deref:tt)+])? <$with:ty>,)*) => {$(
+        impl<U $(, $bounds)*> PartialEq<$with> for Cow<'_, $inner, U>
+        where
+            U: Capacity,
+            $( $bounds: Clone + PartialEq, )*
+        {
+            #[inline]
+            fn eq(&self, other: &$with) -> bool {
+                self.borrow() == $($($deref)*)* other
+            }
+        }
+
+        impl<U $(, $bounds)*> PartialEq<Cow<'_, $inner, U>> for $with
+        where
+            U: Capacity,
+            $( $bounds: Clone + PartialEq, )*
+        {
+            #[inline]
+            fn eq(&self, other: &Cow<$inner, U>) -> bool {
+                $($($deref)*)* self == other.borrow()
+            }
+        }
+    )*};
 }
 
-impl<U> PartialEq<Cow<'_, str, U>> for &str
-where
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<str, U>) -> bool {
-        *self == other.borrow()
-    }
-}
-
-impl<U> PartialEq<Cow<'_, str, U>> for String
-where
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<str, U>) -> bool {
-        self == other.borrow()
-    }
-}
-
-impl<T, U> PartialEq<Cow<'_, [T], U>> for [T]
-where
-    T: Clone + PartialEq,
-    [T]: Beef,
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<[T], U>) -> bool {
-        self == other.borrow()
-    }
-}
-
-impl<T, U> PartialEq<Cow<'_, [T], U>> for &[T]
-where
-    T: Clone + PartialEq,
-    [T]: Beef,
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<[T], U>) -> bool {
-        *self == other.borrow()
-    }
-}
-
-impl<T, U> PartialEq<Cow<'_, [T], U>> for Vec<T>
-where
-    T: Clone + PartialEq,
-    [T]: Beef,
-    U: Capacity,
-{
-    #[inline]
-    fn eq(&self, other: &Cow<[T], U>) -> bool {
-        &self[..] == other.borrow()
-    }
+impl_eq! {
+    str => <str>,
+    str => [*]<&str>,
+    str => <String>,
+    @for<T> [T] => <[T]>,
+    @for<T> [T] => [*]<&[T]>,
+    @for<T> [T] => [&**]<Vec<T>>,
 }
 
 impl<T, U> fmt::Debug for Cow<'_, T, U>
