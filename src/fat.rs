@@ -2,6 +2,8 @@ use core::num::NonZeroUsize;
 use core::ptr::slice_from_raw_parts_mut;
 use crate::traits::Capacity;
 
+/// Three word variant of `Cow` that puts the ownership tag in capacity.
+/// This is a type alias, for documentation see `beef::generic::Cow`.
 pub type Cow<'a, T> = crate::generic::Cow<'a, T, Option<NonZeroUsize>>;
 
 impl Capacity for Option<NonZeroUsize> {

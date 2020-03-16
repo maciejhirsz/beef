@@ -10,6 +10,8 @@ use core::ptr::NonNull;
 use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
+///
+/// This type is using a generic `U: Capacity`. Use either `beef::Cow` or `beef::skinny::Cow` in your code.
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     inner: NonNull<T>,
@@ -23,6 +25,14 @@ where
     U: Capacity,
 {
     /// Owned data.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    ///	use beef::Cow;
+    ///
+    /// let owned: Cow<str> = Cow::owned("I own my content".to_string());
+    /// ```
     #[inline]
     pub fn owned(val: T::Owned) -> Self {
         let (inner, capacity) = T::owned_into_parts(val);
@@ -40,33 +50,20 @@ where
     T: Beef + ?Sized,
     U: Capacity,
 {
-    // // This requires nightly:
-    // // https://github.com/rust-lang/rust/issues/57563
-    // /// Owned data.
-    // #[cfg(feature = "const_fn")]
-    // #[inline]
-    // pub const fn borrowed(val: &'a T) -> Self {
-    //     Cow {
-    //         // A note on soundness:
-    //         //
-    //         // We are casting *const T to *mut T, however for all borrowed values
-    //         // this raw pointer is only ever dereferenced back to &T.
-    //         inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
-    //         capacity: None,
-    //         marker: PhantomData,
-    //     }
-    // }
-
-    #[cfg(not(feature = "const_fn"))]
+    /// Borrowed data.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    ///	use beef::Cow;
+    ///
+    /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
+    /// ```
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
     	let (inner, capacity) = T::ref_into_parts(val);
 
         Cow {
-            // A note on soundness:
-            //
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
             inner,
             capacity,
             marker: PhantomData,

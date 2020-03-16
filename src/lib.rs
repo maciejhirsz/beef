@@ -1,5 +1,3 @@
-//! # beef
-//!
 //! Alternative implementation of `Cow` that's more compact in memory.
 //!
 //! **[Changelog](https://github.com/maciejhirsz/beef/releases) -**
@@ -7,7 +5,6 @@
 //! **[Repository](https://github.com/maciejhirsz/beef)**
 //!
 //! ```rust
-//! # fn main() {
 //! use beef::Cow;
 //!
 //! let borrowed = Cow::borrowed("Hello");
@@ -17,10 +14,23 @@
 //!     format!("{} {}!", borrowed, owned),
 //!     "Hello World!",
 //! );
+//! ```
 //!
-//! // beef::Cow is 3 word sized, while std::borrow::Cow is 4 word sized
-//! assert!(std::mem::size_of::<Cow<str>>() < std::mem::size_of::<std::borrow::Cow<str>>());
-//! # }
+//! There are two versions of `Cow` exposed by this crate:
+//!
+//! + `beef::Cow` is 3 words wide: pointer, length, and capacity. It stores the ownership tag in capacity.
+//! + `beef::skinny::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
+//!
+//! Both versions are leaner than the `std::borrow::Cow`:
+//!
+//! ```rust
+//! use std::mem::size_of;
+//!
+//! const WORD: usize = size_of::<usize>();
+//!
+//! assert_eq!(size_of::<std::borrow::Cow<str>>(), 4 * WORD);
+//! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
+//! assert_eq!(size_of::<beef::skinny::Cow<str>>(), 2 * WORD);
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
@@ -29,10 +39,11 @@
 extern crate alloc;
 
 mod fat;
+mod traits;
 
-pub mod traits;
-pub mod generic;
+#[cfg(target_pointer_width = "64")]
 pub mod skinny;
+pub mod generic;
 
 pub use fat::Cow;
 
