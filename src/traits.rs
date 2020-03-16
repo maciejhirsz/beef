@@ -4,12 +4,12 @@ use alloc::vec::Vec;
 use core::mem::ManuallyDrop;
 use core::ptr::{slice_from_raw_parts, NonNull};
 
-pub(crate) use internal::Word;
+pub(crate) use internal::Capacity;
 
 mod internal {
     use super::*;
 
-    pub trait Word: Copy {
+    pub trait Capacity: Copy {
         type NonZero: Copy;
 
         fn from(word: usize) -> Self;
@@ -33,37 +33,37 @@ mod internal {
 pub unsafe trait Beef: ToOwned {
     type PointerT;
 
-    fn len<U: Word>(&self) -> U;
+    fn len<U: Capacity>(&self) -> U;
 
     fn ref_from_parts<U>(ptr: NonNull<Self::PointerT>, len: U) -> *const Self
     where
-        U: Word;
+        U: Capacity;
 
     /// Convert `T::Owned` to `NonNull<T>` and capacity.
     /// Return `None` for `0` capacity.
     fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self::PointerT>, U, Option<U::NonZero>)
     where
-        U: Word;
+        U: Capacity;
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
     unsafe fn owned_from_parts<U>(ptr: NonNull<Self::PointerT>, len: U, capacity: U::NonZero) -> Self::Owned
     where
-        U: Word;
+        U: Capacity;
 }
 
 unsafe impl Beef for str {
     type PointerT = u8;
 
     #[inline]
-    fn len<U: Word>(&self) -> U {
+    fn len<U: Capacity>(&self) -> U {
         U::from(self.len())
     }
 
     #[inline]
     fn ref_from_parts<U>(ptr: NonNull<u8>, len: U) -> *const str
     where
-        U: Word,
+        U: Capacity,
     {
         slice_from_raw_parts(ptr.as_ptr(), len.into()) as *const str
     }
@@ -71,7 +71,7 @@ unsafe impl Beef for str {
     #[inline]
     fn owned_into_parts<U>(owned: String) -> (NonNull<u8>, U, Option<U::NonZero>)
     where
-        U: Word,
+        U: Capacity,
     {
         // Convert to `String::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
@@ -86,7 +86,7 @@ unsafe impl Beef for str {
     #[inline]
     unsafe fn owned_from_parts<U>(ptr: NonNull<u8>, len: U, capacity: U::NonZero) -> String
     where
-        U: Word,
+        U: Capacity,
     {
         String::from_utf8_unchecked(Vec::from_raw_parts(
             ptr.as_ptr(),
@@ -100,14 +100,14 @@ unsafe impl<T: Clone> Beef for [T] {
     type PointerT = T;
 
     #[inline]
-    fn len<U: Word>(&self) -> U {
+    fn len<U: Capacity>(&self) -> U {
         U::from(self.len())
     }
 
     #[inline]
     fn ref_from_parts<U>(ptr: NonNull<T>, len: U) -> *const [T]
     where
-        U: Word,
+        U: Capacity,
     {
         slice_from_raw_parts(ptr.as_ptr(), len.into())
     }
@@ -115,7 +115,7 @@ unsafe impl<T: Clone> Beef for [T] {
     #[inline]
     fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<T>, U, Option<U::NonZero>)
     where
-        U: Word,
+        U: Capacity,
     {
         // Convert to `Vec::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
@@ -129,7 +129,7 @@ unsafe impl<T: Clone> Beef for [T] {
     #[inline]
     unsafe fn owned_from_parts<U>(ptr: NonNull<T>, len: U, capacity: U::NonZero) -> Vec<T>
     where
-        U: Word,
+        U: Capacity,
     {
         Vec::from_raw_parts(
             ptr.as_ptr(),

@@ -7,11 +7,11 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
-use crate::traits::{Beef, Word};
+use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 // #[derive(Eq)]
-pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Word = usize> {
+pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     ptr: NonNull<T::PointerT>,
     len: U,
     capacity: Option<U::NonZero>,
@@ -21,7 +21,7 @@ pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Word = usize> {
 impl<T, U> Cow<'_, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     /// Owned data.
     #[inline]
@@ -40,7 +40,7 @@ where
 impl<'a, T, U> Cow<'a, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     // // This requires nightly:
     // // https://github.com/rust-lang/rust/issues/57563
@@ -97,7 +97,7 @@ where
 impl<T, U> Hash for Cow<'_, T, U>
 where
     T: Hash + Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -105,9 +105,10 @@ where
     }
 }
 
-impl<'a, T> From<&'a T> for Cow<'a, T>
+impl<'a, T, U> From<&'a T> for Cow<'a, T, U>
 where
     T: Beef + ?Sized,
+    U: Capacity,
 {
     #[inline]
     fn from(val: &'a T) -> Self {
@@ -115,16 +116,20 @@ where
     }
 }
 
-impl From<String> for Cow<'_, str> {
+impl<U> From<String> for Cow<'_, str, U>
+where
+	U: Capacity,
+{
     #[inline]
     fn from(s: String) -> Self {
         Cow::owned(s)
     }
 }
 
-impl<T> From<Vec<T>> for Cow<'_, [T]>
+impl<T, U> From<Vec<T>> for Cow<'_, [T], U>
 where
     T: Clone,
+    U: Capacity,
 {
     #[inline]
     fn from(v: Vec<T>) -> Self {
@@ -135,7 +140,7 @@ where
 impl<T, U> Drop for Cow<'_, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn drop(&mut self) {
@@ -148,7 +153,7 @@ where
 impl<'a, T, U> Clone for Cow<'a, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -162,7 +167,7 @@ where
 impl<T, U> core::ops::Deref for Cow<'_, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     type Target = T;
 
@@ -175,7 +180,7 @@ where
 impl<T, U> AsRef<T> for Cow<'_, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn as_ref(&self) -> &T {
@@ -186,7 +191,7 @@ where
 impl<T, U> Borrow<T> for Cow<'_, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn borrow(&self) -> &T {
@@ -197,7 +202,7 @@ where
 impl<'a, T, U> From<StdCow<'a, T>> for Cow<'a, T, U>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn from(stdcow: StdCow<'a, T>) -> Self {
@@ -211,7 +216,7 @@ where
 impl<'a, T, U> From<Cow<'a, T, U>> for StdCow<'a, T>
 where
     T: Beef + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn from(cow: Cow<'a, T, U>) -> Self {
@@ -227,7 +232,7 @@ where
 impl<T, U, V> PartialEq<V> for Cow<'_, T, U>
 where
     T: Beef + PartialEq + ?Sized,
-    U: Word,
+    U: Capacity,
     V: AsRef<T> + ?Sized,
 {
     #[inline]
@@ -238,7 +243,7 @@ where
 
 impl<U> PartialEq<Cow<'_, str, U>> for str
 where
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<str, U>) -> bool {
@@ -248,7 +253,7 @@ where
 
 impl<U> PartialEq<Cow<'_, str, U>> for &str
 where
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<str, U>) -> bool {
@@ -258,7 +263,7 @@ where
 
 impl<U> PartialEq<Cow<'_, str, U>> for String
 where
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<str, U>) -> bool {
@@ -270,7 +275,7 @@ impl<T, U> PartialEq<Cow<'_, [T], U>> for [T]
 where
     T: Clone + PartialEq,
     [T]: Beef,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<[T], U>) -> bool {
@@ -282,7 +287,7 @@ impl<T, U> PartialEq<Cow<'_, [T], U>> for &[T]
 where
     T: Clone + PartialEq,
     [T]: Beef,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<[T], U>) -> bool {
@@ -294,7 +299,7 @@ impl<T, U> PartialEq<Cow<'_, [T], U>> for Vec<T>
 where
     T: Clone + PartialEq,
     [T]: Beef,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn eq(&self, other: &Cow<[T], U>) -> bool {
@@ -305,7 +310,7 @@ where
 impl<T, U> fmt::Debug for Cow<'_, T, U>
 where
     T: Beef + fmt::Debug + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -316,7 +321,7 @@ where
 impl<T, U> fmt::Display for Cow<'_, T, U>
 where
     T: Beef + fmt::Display + ?Sized,
-    U: Word,
+    U: Capacity,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -324,5 +329,5 @@ where
     }
 }
 
-unsafe impl<T: Beef + Sync + ?Sized, U: Word> Sync for Cow<'_, T, U> {}
-unsafe impl<T: Beef + Send + ?Sized, U: Word> Send for Cow<'_, T, U> {}
+unsafe impl<T: Beef + Sync + ?Sized, U: Capacity> Sync for Cow<'_, T, U> {}
+unsafe impl<T: Beef + Send + ?Sized, U: Capacity> Send for Cow<'_, T, U> {}

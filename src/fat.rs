@@ -1,9 +1,9 @@
 use core::num::NonZeroUsize;
-use crate::traits::Word;
+use crate::traits::Capacity;
 
 pub type Cow<'a, T> = crate::generic::Cow<'a, T, usize>;
 
-impl Word for usize {
+impl Capacity for usize {
     type NonZero = NonZeroUsize;
 
     #[inline]
