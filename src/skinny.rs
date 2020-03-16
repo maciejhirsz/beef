@@ -1,6 +1,6 @@
 //! Namespace containing the 2-word `Cow` implementation.
 
-use core::ptr::slice_from_raw_parts_mut;
+use core::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 use crate::traits::Capacity;
 
 /// Faster, 2-word `Cow`. This version is available only on 64-bit architecture,
@@ -24,6 +24,13 @@ const MASK_HI: usize = !u32::max_value() as usize;
 
 impl Capacity for Cursed {
     type NonZero = Cursed;
+
+    #[inline]
+    fn as_ref<T>(ptr: *const [T]) -> *const [T] {
+        let len = unsafe { (*ptr).len() };
+
+        slice_from_raw_parts(ptr as *mut T, len & MASK_LO)
+    }
 
     #[inline]
     fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Cursed) {

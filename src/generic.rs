@@ -82,16 +82,17 @@ where
 
         match cow.capacity() {
             Some(capacity) => unsafe { T::owned_from_parts::<U>(cow.inner, capacity) },
-            None => unsafe { &*cow.inner.as_ptr() }.to_owned(),
+            None => unsafe { &*T::ref_from_parts::<U>(cow.inner) }.to_owned(),
         }
     }
 
     /// Internal convenience method for casting `inner` into a `&T`
     #[inline]
     fn borrow(&self) -> &T {
-        unsafe { &*self.inner.as_ptr() }
+        unsafe { &*T::ref_from_parts::<U>(self.inner) }
     }
 
+    #[inline]
     fn capacity(&self) -> Option<U::NonZero> {
         U::maybe(T::len(self.inner.as_ptr()), self.capacity)
     }
@@ -227,7 +228,7 @@ where
 
         match cow.capacity() {
             Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.inner, capacity) }),
-            None => StdCow::Borrowed(unsafe { &*cow.inner.as_ptr() }),
+            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.inner) }),
         }
     }
 }

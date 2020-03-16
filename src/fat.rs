@@ -10,6 +10,11 @@ impl Capacity for Option<NonZeroUsize> {
     type NonZero = NonZeroUsize;
 
     #[inline]
+    fn as_ref<T>(ptr: *const [T]) -> *const [T] {
+        ptr
+    }
+
+    #[inline]
     fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Self) {
         (slice_from_raw_parts_mut(ptr, len), None)
     }

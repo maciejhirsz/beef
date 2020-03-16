@@ -11,6 +11,8 @@ mod internal {
     pub trait Capacity: Copy {
         type NonZero: Copy;
 
+        fn as_ref<T>(ptr: *const [T]) -> *const [T];
+
         fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Self);
 
         fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Self);
@@ -35,6 +37,10 @@ mod internal {
         where
             U: Capacity;
 
+        unsafe fn ref_from_parts<U>(inner: NonNull<Self>) -> *const Self
+        where
+            U: Capacity;
+
         /// Convert `T::Owned` to `NonNull<T>` and capacity.
         /// Return `None` for `0` capacity.
         fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self>, U)
@@ -55,7 +61,7 @@ mod internal {
         }
 
         #[inline]
-        fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
+        fn ref_into_parts<U>(&self) -> (NonNull<str>, U)
         where
             U: Capacity
         {
@@ -66,6 +72,14 @@ mod internal {
             let (inner, cap) = U::empty(self.as_ptr() as *mut u8, self.len());
 
             (unsafe { NonNull::new_unchecked(inner as *mut str) }, cap)
+        }
+
+        #[inline]
+        unsafe fn ref_from_parts<U>(inner: NonNull<str>) -> *const str
+        where
+            U: Capacity
+        {
+            U::as_ref(inner.as_ptr() as *mut [u8]) as *const str
         }
 
         #[inline]
@@ -112,6 +126,14 @@ mod internal {
             let (inner, cap) = U::empty(self.as_ptr() as *mut T, self.len());
 
             (unsafe { NonNull::new_unchecked(inner) }, cap)
+        }
+
+        #[inline]
+        unsafe fn ref_from_parts<U>(inner: NonNull<[T]>) -> *const [T]
+        where
+            U: Capacity
+        {
+            U::as_ref(inner.as_ptr())
         }
 
         #[inline]

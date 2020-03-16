@@ -1,4 +1,4 @@
-//! Alternative implementation of `Cow` that's more compact in memory.
+//! Faster, more compact implementation of `Cow`.
 //!
 //! **[Changelog](https://github.com/maciejhirsz/beef/releases) -**
 //! **[Cargo](https://crates.io/crates/beef) -**
