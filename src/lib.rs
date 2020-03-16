@@ -35,12 +35,13 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::num::NonZeroUsize;
-use core::ptr::{slice_from_raw_parts_mut, NonNull};
+use core::ptr::{slice_from_raw_parts, NonNull};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a> {
-    inner: NonNull<T>,
+    ptr: NonNull<T::PointerT>,
+    len: usize,
     capacity: Option<NonZeroUsize>,
     marker: PhantomData<&'a T>,
 }
@@ -54,37 +55,57 @@ pub struct Cow<'a, T: Beef + ?Sized + 'a> {
 /// + `T::Owned` with `capacity` of `0` does not allocate memory.
 /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
 pub unsafe trait Beef: ToOwned {
+    type PointerT;
+
+    fn len(&self) -> usize;
+
+    fn as_ptr(&self) -> *const Self::PointerT;
+
+    fn ref_from_parts(ptr: NonNull<Self::PointerT>, len: usize) -> *const Self;
+
     /// Convert `T::Owned` to `NonNull<T>` and capacity.
     /// Return `None` for `0` capacity.
-    fn owned_into_parts(owned: Self::Owned) -> (NonNull<Self>, Option<NonZeroUsize>);
+    fn owned_into_parts(owned: Self::Owned) -> (NonNull<Self::PointerT>, usize, Option<NonZeroUsize>);
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
-    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> Self::Owned;
+    unsafe fn owned_from_parts(ptr: NonNull<Self::PointerT>, len: usize, capacity: NonZeroUsize) -> Self::Owned;
 }
 
 unsafe impl Beef for str {
+    type PointerT = u8;
+
     #[inline]
-    fn owned_into_parts(owned: String) -> (NonNull<str>, Option<NonZeroUsize>) {
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn as_ptr(&self) -> *const u8 {
+        self.as_ptr()
+    }
+
+    #[inline]
+    fn ref_from_parts(ptr: NonNull<u8>, len: usize) -> *const str {
+        slice_from_raw_parts(ptr.as_ptr(), len) as *const str
+    }
+
+    #[inline]
+    fn owned_into_parts(owned: String) -> (NonNull<u8>, usize, Option<NonZeroUsize>) {
         // Convert to `String::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
-        let ptr = slice_from_raw_parts_mut(
-            owned.as_mut_ptr(),
-            owned.len(),
-        );
 
         (
-            unsafe { NonNull::new_unchecked(ptr as *mut str) },
+            unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
+            owned.len(),
             NonZeroUsize::new(owned.capacity()),
         )
     }
 
     #[inline]
-    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> String {
-        let len = ptr.as_ref().len();
-
+    unsafe fn owned_from_parts(ptr: NonNull<u8>, len: usize, capacity: NonZeroUsize) -> String {
         String::from_utf8_unchecked(Vec::from_raw_parts(
-            ptr.cast().as_ptr(),
+            ptr.as_ptr(),
             len,
             capacity.get(),
         ))
@@ -92,27 +113,38 @@ unsafe impl Beef for str {
 }
 
 unsafe impl<T: Clone> Beef for [T] {
+    type PointerT = T;
+
     #[inline]
-    fn owned_into_parts(owned: Vec<T>) -> (NonNull<[T]>, Option<NonZeroUsize>) {
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn as_ptr(&self) -> *const T {
+        self.as_ptr()
+    }
+
+    #[inline]
+    fn ref_from_parts(ptr: NonNull<T>, len: usize) -> *const [T] {
+        slice_from_raw_parts(ptr.as_ptr(), len)
+    }
+
+    #[inline]
+    fn owned_into_parts(owned: Vec<T>) -> (NonNull<T>, usize, Option<NonZeroUsize>) {
         // Convert to `Vec::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
-        let ptr = slice_from_raw_parts_mut(
-            owned.as_mut_ptr(),
-            owned.len(),
-        );
-
         (
-            unsafe { NonNull::new_unchecked(ptr) },
+            unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
+            owned.len(),
             NonZeroUsize::new(owned.capacity()),
         )
     }
 
     #[inline]
-    unsafe fn owned_from_parts(ptr: NonNull<Self>, capacity: NonZeroUsize) -> Vec<T> {
-        let len = ptr.as_ref().len();
-
+    unsafe fn owned_from_parts(ptr: NonNull<T>, len: usize, capacity: NonZeroUsize) -> Vec<T> {
         Vec::from_raw_parts(
-            ptr.cast().as_ptr(),
+            ptr.as_ptr(),
             len,
             capacity.get(),
         )
@@ -126,10 +158,11 @@ where
     /// Owned data.
     #[inline]
     pub fn owned(val: B::Owned) -> Self {
-        let (inner, capacity) = B::owned_into_parts(val);
+        let (ptr, len, capacity) = B::owned_into_parts(val);
 
         Cow {
-            inner,
+            ptr,
+            len,
             capacity,
             marker: PhantomData,
         }
@@ -140,24 +173,23 @@ impl<'a, T> Cow<'a, T>
 where
     T: Beef + ?Sized,
 {
-    // This requires nightly:
-    // https://github.com/rust-lang/rust/issues/57563
-    /// Owned data.
-    #[cfg(feature = "const_fn")]
-    #[inline]
-    pub const fn borrowed(val: &'a T) -> Self {
-        Cow {
-            // A note on soundness:
-            //
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
-            capacity: None,
-            marker: PhantomData,
-        }
-    }
+    // // This requires nightly:
+    // // https://github.com/rust-lang/rust/issues/57563
+    // /// Owned data.
+    // #[cfg(feature = "const_fn")]
+    // #[inline]
+    // pub const fn borrowed(val: &'a T) -> Self {
+    //     Cow {
+    //         // A note on soundness:
+    //         //
+    //         // We are casting *const T to *mut T, however for all borrowed values
+    //         // this raw pointer is only ever dereferenced back to &T.
+    //         ptr: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
+    //         capacity: None,
+    //         marker: PhantomData,
+    //     }
+    // }
 
-    /// Owned data.
     #[cfg(not(feature = "const_fn"))]
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
@@ -166,7 +198,8 @@ where
             //
             // We are casting *const T to *mut T, however for all borrowed values
             // this raw pointer is only ever dereferenced back to &T.
-            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
+            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut T::PointerT) },
+            len: val.len(),
             capacity: None,
             marker: PhantomData,
         }
@@ -180,15 +213,15 @@ where
         let cow = ManuallyDrop::new(self);
 
         match cow.capacity {
-            Some(capacity) => unsafe { T::owned_from_parts(cow.inner, capacity) },
-            None => unsafe { cow.inner.as_ref() }.to_owned(),
+            Some(capacity) => unsafe { T::owned_from_parts(cow.ptr, cow.len, capacity) },
+            None => unsafe { &*T::ref_from_parts(cow.ptr, cow.len) }.to_owned(),
         }
     }
 
-    /// Internal convenience method for casting `inner` into a `&T`
+    /// Internal convenience method for casting `ptr` into a `&T`
     #[inline]
     fn borrow(&self) -> &T {
-        unsafe { self.inner.as_ref() }
+        unsafe { &*T::ref_from_parts(self.ptr, self.len) }
     }
 }
 
@@ -236,7 +269,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity {
-            unsafe { T::owned_from_parts(self.inner, capacity) };
+            unsafe { T::owned_from_parts(self.ptr, self.len, capacity) };
         }
     }
 }
@@ -308,8 +341,8 @@ where
         let cow = ManuallyDrop::new(cow);
 
         match cow.capacity {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(cow.inner, capacity) }),
-            None => StdCow::Borrowed(unsafe { &*cow.inner.as_ptr() }),
+            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(cow.ptr, cow.len, capacity) }),
+            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts(cow.ptr, cow.len) }),
         }
     }
 }
