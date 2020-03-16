@@ -113,7 +113,6 @@ fn skinny_beef_as_ref(b: &mut Bencher) {
     });
 }
 
-
 #[bench]
 fn std_create(b: &mut Bencher) {
     let words: Vec<_> = TEXT.split_whitespace().collect();

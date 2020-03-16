@@ -12,9 +12,8 @@ use crate::traits::{Beef, Capacity};
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 // #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
-    ptr: NonNull<T::PointerT>,
-    len: U,
-    capacity: Option<U::NonZero>,
+    inner: NonNull<T>,
+    capacity: U,
     marker: PhantomData<&'a T>,
 }
 
@@ -26,11 +25,10 @@ where
     /// Owned data.
     #[inline]
     pub fn owned(val: T::Owned) -> Self {
-        let (ptr, len, capacity) = T::owned_into_parts(val);
+        let (inner, capacity) = T::owned_into_parts(val);
 
         Cow {
-            ptr,
-            len,
+            inner,
             capacity,
             marker: PhantomData,
         }
@@ -53,7 +51,7 @@ where
     //         //
     //         // We are casting *const T to *mut T, however for all borrowed values
     //         // this raw pointer is only ever dereferenced back to &T.
-    //         ptr: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
+    //         inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
     //         capacity: None,
     //         marker: PhantomData,
     //     }
@@ -62,14 +60,15 @@ where
     #[cfg(not(feature = "const_fn"))]
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
+    	let (inner, capacity) = T::ref_into_parts(val);
+
         Cow {
             // A note on soundness:
             //
             // We are casting *const T to *mut T, however for all borrowed values
             // this raw pointer is only ever dereferenced back to &T.
-            ptr: unsafe { NonNull::new_unchecked(val as *const T as *mut T).cast() },
-            len: val.len(),
-            capacity: None,
+            inner,
+            capacity,
             marker: PhantomData,
         }
     }
@@ -81,16 +80,20 @@ where
     pub fn into_owned(self) -> T::Owned {
         let cow = ManuallyDrop::new(self);
 
-        match cow.capacity {
-            Some(capacity) => unsafe { T::owned_from_parts(cow.ptr, cow.len, capacity) },
-            None => unsafe { &*T::ref_from_parts(cow.ptr, cow.len) }.to_owned(),
+        match cow.capacity() {
+            Some(capacity) => unsafe { T::owned_from_parts::<U>(cow.inner, capacity) },
+            None => unsafe { &*cow.inner.as_ptr() }.to_owned(),
         }
     }
 
-    /// Internal convenience method for casting `ptr` into a `&T`
+    /// Internal convenience method for casting `inner` into a `&T`
     #[inline]
     fn borrow(&self) -> &T {
-        unsafe { &*T::ref_from_parts(self.ptr, self.len) }
+        unsafe { &*self.inner.as_ptr() }
+    }
+
+    fn capacity(&self) -> Option<U::NonZero> {
+    	U::maybe(T::len(self.inner.as_ptr()), self.capacity)
     }
 }
 
@@ -144,8 +147,8 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        if let Some(capacity) = self.capacity {
-            unsafe { T::owned_from_parts(self.ptr, self.len, capacity) };
+        if let Some(capacity) = self.capacity() {
+            unsafe { T::owned_from_parts::<U>(self.inner, capacity) };
         }
     }
 }
@@ -157,7 +160,7 @@ where
 {
     #[inline]
     fn clone(&self) -> Self {
-        match self.capacity {
+        match self.capacity() {
             Some(_) => Cow::owned(self.borrow().to_owned()),
             None => Cow { ..*self },
         }
@@ -222,9 +225,9 @@ where
     fn from(cow: Cow<'a, T, U>) -> Self {
         let cow = ManuallyDrop::new(cow);
 
-        match cow.capacity {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts(cow.ptr, cow.len, capacity) }),
-            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts(cow.ptr, cow.len) }),
+        match cow.capacity() {
+            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.inner, capacity) }),
+            None => StdCow::Borrowed(unsafe { &*cow.inner.as_ptr() }),
         }
     }
 }

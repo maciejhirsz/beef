@@ -2,23 +2,21 @@ use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem::ManuallyDrop;
-use core::ptr::{slice_from_raw_parts, NonNull};
+use core::ptr::NonNull;
 
 pub(crate) use internal::Capacity;
 
 mod internal {
-    use super::*;
-
     pub trait Capacity: Copy {
         type NonZero: Copy;
 
-        fn from(word: usize) -> Self;
+        fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Self);
 
-        fn nonzero_from(word: usize) -> Option<Self::NonZero>;
+        fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Self);
 
-        fn into(self) -> usize;
+        fn unpack(len: usize, capacity: Self::NonZero) -> (usize, usize);
 
-        fn nonzero_into(word: Self::NonZero) -> usize;
+        fn maybe(len: usize, capacity: Self) -> Option<Self::NonZero>;
     }
 }
 
@@ -31,110 +29,103 @@ mod internal {
 /// + `T::Owned` with `capacity` of `0` does not allocate memory.
 /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
 pub unsafe trait Beef: ToOwned {
-    type PointerT;
+    fn len(ptr: *const Self) -> usize;
 
-    fn len<U: Capacity>(&self) -> U;
-
-    fn ref_from_parts<U>(ptr: NonNull<Self::PointerT>, len: U) -> *const Self
+    fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
     where
         U: Capacity;
 
     /// Convert `T::Owned` to `NonNull<T>` and capacity.
     /// Return `None` for `0` capacity.
-    fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self::PointerT>, U, Option<U::NonZero>)
+    fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self>, U)
     where
         U: Capacity;
 
     /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
     /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
-    unsafe fn owned_from_parts<U>(ptr: NonNull<Self::PointerT>, len: U, capacity: U::NonZero) -> Self::Owned
+    unsafe fn owned_from_parts<U>(inner: NonNull<Self>, capacity: U::NonZero) -> Self::Owned
     where
         U: Capacity;
 }
 
 unsafe impl Beef for str {
-    type PointerT = u8;
-
     #[inline]
-    fn len<U: Capacity>(&self) -> U {
-        U::from(self.len())
+    fn len(ptr: *const str) -> usize {
+        unsafe { (&*ptr).len() }
     }
 
     #[inline]
-    fn ref_from_parts<U>(ptr: NonNull<u8>, len: U) -> *const str
+    fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
     where
-        U: Capacity,
+        U: Capacity
     {
-        slice_from_raw_parts(ptr.as_ptr(), len.into()) as *const str
+        let (inner, cap) = U::empty(self.as_ptr() as *mut u8, self.len());
+
+        (unsafe { NonNull::new_unchecked(inner as *mut str) }, cap)
     }
 
     #[inline]
-    fn owned_into_parts<U>(owned: String) -> (NonNull<u8>, U, Option<U::NonZero>)
+    fn owned_into_parts<U>(owned: String) -> (NonNull<str>, U)
     where
         U: Capacity,
     {
         // Convert to `String::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
+        let (inner, cap) = U::store(owned.as_mut_ptr(), owned.len(), owned.capacity());
 
-        (
-            unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
-            U::from(owned.len()),
-            U::nonzero_from(owned.capacity()),
-        )
+        (unsafe { NonNull::new_unchecked(inner as *mut str) }, cap)
     }
 
     #[inline]
-    unsafe fn owned_from_parts<U>(ptr: NonNull<u8>, len: U, capacity: U::NonZero) -> String
+    unsafe fn owned_from_parts<U>(inner: NonNull<str>, capacity: U::NonZero) -> String
     where
         U: Capacity,
     {
-        String::from_utf8_unchecked(Vec::from_raw_parts(
-            ptr.as_ptr(),
-            U::into(len),
-            U::nonzero_into(capacity),
-        ))
+        let len = (*inner.as_ptr()).len();
+        let (len, cap) = U::unpack(len, capacity);
+
+        String::from_utf8_unchecked(
+            Vec::from_raw_parts(inner.cast().as_ptr(), len, cap),
+        )
     }
 }
 
 unsafe impl<T: Clone> Beef for [T] {
-    type PointerT = T;
-
     #[inline]
-    fn len<U: Capacity>(&self) -> U {
-        U::from(self.len())
+    fn len(ptr: *const [T]) -> usize {
+        unsafe { (&*ptr).len() }
     }
 
     #[inline]
-    fn ref_from_parts<U>(ptr: NonNull<T>, len: U) -> *const [T]
+    fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
     where
-        U: Capacity,
+        U: Capacity
     {
-        slice_from_raw_parts(ptr.as_ptr(), len.into())
+        let (inner, cap) = U::empty(self.as_ptr() as *mut T, self.len());
+
+        (unsafe { NonNull::new_unchecked(inner) }, cap)
     }
 
     #[inline]
-    fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<T>, U, Option<U::NonZero>)
+    fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<[T]>, U)
     where
         U: Capacity,
     {
         // Convert to `Vec::into_raw_parts` once stabilized
         let mut owned = ManuallyDrop::new(owned);
-        (
-            unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
-            U::from(owned.len()),
-            U::nonzero_from(owned.capacity()),
-        )
+        let (inner, cap) = U::store(owned.as_mut_ptr(), owned.len(), owned.capacity());
+
+        (unsafe { NonNull::new_unchecked(inner) }, cap)
     }
 
     #[inline]
-    unsafe fn owned_from_parts<U>(ptr: NonNull<T>, len: U, capacity: U::NonZero) -> Vec<T>
+    unsafe fn owned_from_parts<U>(inner: NonNull<[T]>, capacity: U::NonZero) -> Vec<T>
     where
         U: Capacity,
     {
-        Vec::from_raw_parts(
-            ptr.as_ptr(),
-            U::into(len),
-            U::nonzero_into(capacity),
-        )
+        let len = (*inner.as_ptr()).len();
+        let (len, cap) = U::unpack(len, capacity);
+
+        Vec::from_raw_parts(inner.cast().as_ptr(), len, cap)
     }
 }
