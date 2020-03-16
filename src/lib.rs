@@ -59,8 +59,6 @@ pub unsafe trait Beef: ToOwned {
 
     fn len(&self) -> usize;
 
-    fn as_ptr(&self) -> *const Self::PointerT;
-
     fn ref_from_parts(ptr: NonNull<Self::PointerT>, len: usize) -> *const Self;
 
     /// Convert `T::Owned` to `NonNull<T>` and capacity.
@@ -78,11 +76,6 @@ unsafe impl Beef for str {
     #[inline]
     fn len(&self) -> usize {
         self.len()
-    }
-
-    #[inline]
-    fn as_ptr(&self) -> *const u8 {
-        self.as_ptr()
     }
 
     #[inline]
@@ -118,11 +111,6 @@ unsafe impl<T: Clone> Beef for [T] {
     #[inline]
     fn len(&self) -> usize {
         self.len()
-    }
-
-    #[inline]
-    fn as_ptr(&self) -> *const T {
-        self.as_ptr()
     }
 
     #[inline]
@@ -198,7 +186,7 @@ where
             //
             // We are casting *const T to *mut T, however for all borrowed values
             // this raw pointer is only ever dereferenced back to &T.
-            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut T::PointerT) },
+            ptr: unsafe { NonNull::new_unchecked(val as *const T as *mut T).cast() },
             len: val.len(),
             capacity: None,
             marker: PhantomData,
