@@ -10,7 +10,7 @@ use core::ptr::NonNull;
 use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
-// #[derive(Eq)]
+#[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     inner: NonNull<T>,
     capacity: U,
