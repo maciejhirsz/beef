@@ -15,4 +15,14 @@ impl Word for usize {
     fn nonzero_from(word: usize) -> Option<NonZeroUsize> {
         NonZeroUsize::new(word)
     }
+
+    #[inline]
+    fn into(self) -> usize {
+    	self
+    }
+
+    #[inline]
+    fn nonzero_into(word: NonZeroUsize) -> usize {
+    	word.get()
+    }
 }

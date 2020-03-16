@@ -4,7 +4,6 @@ extern crate beef;
 extern crate test;
 
 use std::borrow::{Cow as StdCow, ToOwned};
-use beef::Cow;
 use test::{Bencher, black_box};
 
 const NTH_WORD: usize = 4;
@@ -12,6 +11,8 @@ static TEXT: &str = "In less than a half-hour, Joe had distributed ninety-two pa
 
 #[bench]
 fn beef_create(b: &mut Bencher) {
+    use beef::Cow;
+
     let words: Vec<_> = TEXT.split_whitespace().collect();
 
     b.iter(|| {
@@ -23,6 +24,8 @@ fn beef_create(b: &mut Bencher) {
 
 #[bench]
 fn beef_create_mixed(b: &mut Bencher) {
+    use beef::Cow;
+
     let words: Vec<_> = TEXT.split_whitespace().collect();
 
     b.iter(|| {
@@ -40,6 +43,8 @@ fn beef_create_mixed(b: &mut Bencher) {
 
 #[bench]
 fn beef_as_ref(b: &mut Bencher) {
+    use beef::Cow;
+
     let cow_words: Vec<_> = TEXT.split_whitespace().map(|word| {
         if word.len() % NTH_WORD == 0 {
             Cow::owned(word.to_owned())
@@ -55,6 +60,59 @@ fn beef_as_ref(b: &mut Bencher) {
         }
     });
 }
+
+#[bench]
+fn skinny_beef_create(b: &mut Bencher) {
+    use beef::skinny::Cow;
+
+    let words: Vec<_> = TEXT.split_whitespace().collect();
+
+    b.iter(|| {
+        let cow_words: Vec<Cow<str>> = words.iter().copied().map(Cow::borrowed).collect();
+
+        black_box(cow_words)
+    });
+}
+
+#[bench]
+fn skinny_beef_create_mixed(b: &mut Bencher) {
+    use beef::skinny::Cow;
+
+    let words: Vec<_> = TEXT.split_whitespace().collect();
+
+    b.iter(|| {
+        let cow_words: Vec<Cow<str>> = words.iter().copied().map(|word| {
+            if word.len() % NTH_WORD == 0 {
+                Cow::owned(word.to_owned())
+            } else {
+                Cow::borrowed(word)
+            }
+        }).collect();
+
+        black_box(cow_words)
+    });
+}
+
+#[bench]
+fn skinny_beef_as_ref(b: &mut Bencher) {
+    use beef::skinny::Cow;
+
+    let cow_words: Vec<_> = TEXT.split_whitespace().map(|word| {
+        if word.len() % NTH_WORD == 0 {
+            Cow::owned(word.to_owned())
+        } else {
+            Cow::borrowed(word)
+        }
+    }).collect();
+
+    b.iter(|| {
+        for word in cow_words.iter() {
+            let word: &str = word.as_ref();
+            black_box(word);
+        }
+    });
+}
+
 
 #[bench]
 fn std_create(b: &mut Bencher) {

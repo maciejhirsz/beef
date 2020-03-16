@@ -32,6 +32,7 @@ mod fat;
 
 pub mod traits;
 pub mod generic;
+pub mod skinny;
 
 pub use fat::Cow;
 

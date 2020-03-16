@@ -9,12 +9,16 @@ pub(crate) use internal::Word;
 mod internal {
     use super::*;
 
-    pub trait Word: Into<usize> + Copy {
-        type NonZero: Into<usize> + Copy;
+    pub trait Word: Copy {
+        type NonZero: Copy;
 
         fn from(word: usize) -> Self;
 
         fn nonzero_from(word: usize) -> Option<Self::NonZero>;
+
+        fn into(self) -> usize;
+
+        fn nonzero_into(word: Self::NonZero) -> usize;
     }
 }
 
@@ -86,8 +90,8 @@ unsafe impl Beef for str {
     {
         String::from_utf8_unchecked(Vec::from_raw_parts(
             ptr.as_ptr(),
-            len.into(),
-            capacity.into(),
+            U::into(len),
+            U::nonzero_into(capacity),
         ))
     }
 }
@@ -129,8 +133,8 @@ unsafe impl<T: Clone> Beef for [T] {
     {
         Vec::from_raw_parts(
             ptr.as_ptr(),
-            len.into(),
-            capacity.into(),
+            U::into(len),
+            U::nonzero_into(capacity),
         )
     }
 }
