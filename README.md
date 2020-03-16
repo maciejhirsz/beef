@@ -72,7 +72,8 @@ Owned:    | Tag       | Pointer   | Length    | Capacity  |
 Instead of being an enum with a tag, `beef::Cow` uses capacity to determine whether the
 value it's holding is owned (capacity is greater than 0), or borrowed (capacity is 0).
 
-`beef::skinny::Cow` goes even further and puts length and capacity on a single 64 word.
+`beef::skinny::Cow` goes even further and puts length and capacity on a single 64 word,
+which has a further advantage of it being just a fat pointer.
 
 ```text
                    +-----------+-----------+-----------+
@@ -84,6 +85,9 @@ beef::skinny::Cow  | Pointer   | Cap | Len |
                    +-----------+-----+-----+
 ```
 
+Any owned `Vec` or `String` that has 0 capacity is effectively treated as a borrowed
+value. Since having no capacity means there is no actual allocation behind the pointer
+this is safe.
 
 ## Benchmarks
 
