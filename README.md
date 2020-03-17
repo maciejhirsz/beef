@@ -14,8 +14,8 @@ Faster, more compact implementation of `Cow`.
 ```rust
 use beef::Cow;
 
-let borrowed = Cow::borrowed("Hello");
-let owned = Cow::from(String::from("World"));
+let borrowed: Cow<str> = Cow::borrowed("Hello");
+let owned: Cow<str> = Cow::owned(String::from("World"));
 
 assert_eq!(
     format!("{} {}!", borrowed, owned),
