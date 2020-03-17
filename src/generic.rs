@@ -98,6 +98,27 @@ where
     }
 }
 
+impl<'a, T> Cow<'a, T, crate::fat::internal::Wide>
+where
+    T: crate::traits::internal::Beef + ?Sized
+{
+    // This requires nightly:
+    // https://github.com/rust-lang/rust/issues/57563
+    /// Borrowed data.
+    ///
+    /// Requires nightly. Currently not available for `beef::lean::Cow`.
+    #[cfg(feature = "const_fn")]
+    pub const fn const_borrow(val: &'a T) -> Self {
+        Cow {
+            // We are casting *const T to *mut T, however for all borrowed values
+            // this raw pointer is only ever dereferenced back to &T.
+            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
+            capacity: None,
+            marker: PhantomData,
+        }
+    }
+}
+
 impl<T, U> Hash for Cow<'_, T, U>
 where
     T: Hash + Beef + ?Sized,
