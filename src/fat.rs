@@ -34,9 +34,3 @@ impl Capacity for Option<NonZeroUsize> {
         capacity
     }
 }
-
-// impl<T> Cow<[T]> {
-//     const fn const_borrow_slice(va: &[T]) -> Self {
-//         panic!()
-//     }
-// }
