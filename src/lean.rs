@@ -11,19 +11,19 @@ use crate::traits::Capacity;
 ///
 /// `Cow::owned` will panic if capacity is larger than overflows `u32::max_size()`. Use the
 /// top level `beef::Cow` if you wish to avoid this problem.
-pub type Cow<'a, T> = crate::generic::Cow<'a, T, Cursed>;
+pub type Cow<'a, T> = crate::generic::Cow<'a, T, Lean>;
 
 mod internal {
     #[derive(Clone, Copy, PartialEq, Eq)]
-    pub struct Cursed;
+    pub struct Lean;
 }
-use internal::Cursed;
+use internal::Lean;
 
 const MASK_LO: usize = u32::max_value() as usize;
 const MASK_HI: usize = !u32::max_value() as usize;
 
-impl Capacity for Cursed {
-    type NonZero = Cursed;
+impl Capacity for Lean {
+    type NonZero = Lean;
 
     #[inline]
     fn as_ref<T>(ptr: *const [T]) -> *const [T] {
@@ -33,12 +33,12 @@ impl Capacity for Cursed {
     }
 
     #[inline]
-    fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Cursed) {
-        (slice_from_raw_parts_mut(ptr, len & MASK_LO), Cursed)
+    fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Lean) {
+        (slice_from_raw_parts_mut(ptr, len & MASK_LO), Lean)
     }
 
     #[inline]
-    fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Cursed) {
+    fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Lean) {
         if capacity > MASK_LO {
             panic!("beef::lean::Cow: Capacity out of bounds");
         }
@@ -48,19 +48,19 @@ impl Capacity for Cursed {
                 ptr,
                 (len & MASK_LO) | ((capacity & MASK_HI) << 32),
             ),
-            Cursed,
+            Lean,
         )
     }
 
     #[inline]
-    fn unpack(len: usize, _: Cursed) -> (usize, usize) {
+    fn unpack(len: usize, _: Lean) -> (usize, usize) {
         (len & MASK_LO, (len & MASK_HI) >> 32)
     }
 
     #[inline]
-    fn maybe(len: usize, _: Cursed) -> Option<Cursed> {
+    fn maybe(len: usize, _: Lean) -> Option<Lean> {
         if len & MASK_HI != 0 {
-            Some(Cursed)
+            Some(Lean)
         } else {
             None
         }
