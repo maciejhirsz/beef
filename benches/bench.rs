@@ -62,8 +62,8 @@ fn beef_as_ref(b: &mut Bencher) {
 }
 
 #[bench]
-fn skinny_beef_create(b: &mut Bencher) {
-    use beef::skinny::Cow;
+fn lean_beef_create(b: &mut Bencher) {
+    use beef::lean::Cow;
 
     let words: Vec<_> = TEXT.split_whitespace().collect();
 
@@ -75,8 +75,8 @@ fn skinny_beef_create(b: &mut Bencher) {
 }
 
 #[bench]
-fn skinny_beef_create_mixed(b: &mut Bencher) {
-    use beef::skinny::Cow;
+fn lean_beef_create_mixed(b: &mut Bencher) {
+    use beef::lean::Cow;
 
     let words: Vec<_> = TEXT.split_whitespace().collect();
 
@@ -94,8 +94,8 @@ fn skinny_beef_create_mixed(b: &mut Bencher) {
 }
 
 #[bench]
-fn skinny_beef_as_ref(b: &mut Bencher) {
-    use beef::skinny::Cow;
+fn lean_beef_as_ref(b: &mut Bencher) {
+    use beef::lean::Cow;
 
     let cow_words: Vec<_> = TEXT.split_whitespace().map(|word| {
         if word.len() % NTH_WORD == 0 {

@@ -14,7 +14,7 @@ use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 ///
-/// This type is using a generic `U: Capacity`. Use either `beef::Cow` or `beef::skinny::Cow` in your code.
+/// This type is using a generic `U: Capacity`. Use either `beef::Cow` or `beef::lean::Cow` in your code.
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     inner: NonNull<T>,
@@ -104,8 +104,9 @@ where
 {
     // This requires nightly:
     // https://github.com/rust-lang/rust/issues/57563
-    /// Borrowed data. This method is only available on nightly, and only on
-    /// the default `beef::Cow`
+    /// Borrowed data.
+    ///
+    /// Requires nightly. Currently not available for `beef::lean::Cow`.
     #[cfg(feature = "const_fn")]
     pub const fn const_borrow(val: &'a T) -> Self {
         Cow {

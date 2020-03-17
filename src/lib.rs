@@ -19,7 +19,7 @@
 //! There are two versions of `Cow` exposed by this crate:
 //!
 //! + `beef::Cow` is 3 words wide: pointer, length, and capacity. It stores the ownership tag in capacity.
-//! + `beef::skinny::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
+//! + `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
 //!
 //! Both versions are leaner than the `std::borrow::Cow`:
 //!
@@ -30,7 +30,7 @@
 //!
 //! assert_eq!(size_of::<std::borrow::Cow<str>>(), 4 * WORD);
 //! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
-//! assert_eq!(size_of::<beef::skinny::Cow<str>>(), 2 * WORD);
+//! assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
@@ -42,7 +42,7 @@ mod fat;
 mod traits;
 
 #[cfg(target_pointer_width = "64")]
-pub mod skinny;
+pub mod lean;
 pub mod generic;
 
 pub use fat::Cow;

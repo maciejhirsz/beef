@@ -40,7 +40,7 @@ impl Capacity for Cursed {
     #[inline]
     fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Cursed) {
         if capacity > MASK_LO {
-            panic!("beef::skinny::Cow: Capacity out of bounds");
+            panic!("beef::lean::Cow: Capacity out of bounds");
         }
 
         (

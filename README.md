@@ -26,7 +26,7 @@ assert_eq!(
 There are two versions of `Cow` exposed by this crate:
 
 + `beef::Cow` is 3 words wide: pointer, length, and capacity. It stores the ownership tag in capacity.
-+ `beef::skinny::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
++ `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
 
 Both versions are leaner than the `std::borrow::Cow`:
 
@@ -37,7 +37,7 @@ const WORD: usize = size_of::<usize>();
 
 assert_eq!(size_of::<std::borrow::Cow<str>>(), 4 * WORD);
 assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
-assert_eq!(size_of::<beef::skinny::Cow<str>>(), 2 * WORD);
+assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 ```
 
 ## How does it work?
@@ -72,17 +72,17 @@ Owned:    | Tag       | Pointer   | Length    | Capacity  |
 Instead of being an enum with a tag, `beef::Cow` uses capacity to determine whether the
 value it's holding is owned (capacity is greater than 0), or borrowed (capacity is 0).
 
-`beef::skinny::Cow` goes even further and puts length and capacity on a single 64 word,
+`beef::lean::Cow` goes even further and puts length and capacity on a single 64 word,
 which has a further advantage of it being just a fat pointer.
 
 ```text
-                   +-----------+-----------+-----------+
-beef::Cow          | Pointer   | Length    | Capacity? |
-                   +-----------+-----------+-----------+
+                 +-----------+-----------+-----------+
+beef::Cow        | Pointer   | Length    | Capacity? |
+                 +-----------+-----------+-----------+
 
-                   +-----------+-----+-----+
-beef::skinny::Cow  | Pointer   | Cap | Len |
-                   +-----------+-----+-----+
+                 +-----------+-----+-----+
+beef::lean::Cow  | Pointer   | Cap | Len |
+                 +-----------+-----+-----+
 ```
 
 Any owned `Vec` or `String` that has 0 capacity is effectively treated as a borrowed
@@ -97,21 +97,21 @@ cargo +nightly bench
 
 Microbenchmarking obtaining a `&str` reference is rather flaky and you can have widely different results. In general the following seems to hold true:
 
-+ `beef::Cow` and `beef::skinny::Cow` are faster than `std::borrow::Cow` at obtaining a reference `&T`, we don't have to check the tag to do that and the fat pointer is in the same place for both owned and borrowed values.
++ `beef::Cow` and `beef::lean::Cow` are faster than `std::borrow::Cow` at obtaining a reference `&T`. This makes sense since we avoid the enum tag branching.
 + The 3-word `beef::Cow` is faster at creating borrowed variants, but slower at creating owned variants than `std::borrow::Cow`.
-+ The 2-word `beef::skinny::Cow` is faster at both.
++ The 2-word `beef::lean::Cow` is faster at both.
 
 ```
 running 9 tests
-test beef_as_ref              ... bench:          58 ns/iter (+/- 6)
-test beef_create              ... bench:         137 ns/iter (+/- 3)
-test beef_create_mixed        ... bench:         692 ns/iter (+/- 29)
-test skinny_beef_as_ref       ... bench:          53 ns/iter (+/- 2)
-test skinny_beef_create       ... bench:          79 ns/iter (+/- 4)
-test skinny_beef_create_mixed ... bench:         595 ns/iter (+/- 15)
-test std_as_ref               ... bench:          72 ns/iter (+/- 2)
-test std_create               ... bench:         150 ns/iter (+/- 2)
-test std_create_mixed         ... bench:         671 ns/iter (+/- 30)
+test beef_as_ref            ... bench:          57 ns/iter (+/- 15)
+test beef_create            ... bench:         135 ns/iter (+/- 5)
+test beef_create_mixed      ... bench:         659 ns/iter (+/- 52)
+test lean_beef_as_ref       ... bench:          50 ns/iter (+/- 2)
+test lean_beef_create       ... bench:          77 ns/iter (+/- 3)
+test lean_beef_create_mixed ... bench:         594 ns/iter (+/- 52)
+test std_as_ref             ... bench:          70 ns/iter (+/- 6)
+test std_create             ... bench:         142 ns/iter (+/- 7)
+test std_create_mixed       ... bench:         663 ns/iter (+/- 32)
 ```
 
 ## License
