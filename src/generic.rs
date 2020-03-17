@@ -18,7 +18,7 @@ use crate::traits::{Beef, Capacity};
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     inner: NonNull<T>,
-    capacity: U,
+    capacity: U::Field,
     marker: PhantomData<&'a T>,
 }
 
@@ -38,7 +38,7 @@ where
     /// ```
     #[inline]
     pub fn owned(val: T::Owned) -> Self {
-        let (inner, capacity) = T::owned_into_parts(val);
+        let (inner, capacity) = T::owned_into_parts::<U>(val);
 
         Cow {
             inner,
@@ -64,7 +64,7 @@ where
     /// ```
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
-        let (inner, capacity) = T::ref_into_parts(val);
+        let (inner, capacity) = T::ref_into_parts::<U>(val);
 
         Cow {
             inner,
@@ -95,27 +95,6 @@ where
     #[inline]
     fn capacity(&self) -> Option<U::NonZero> {
         U::maybe(T::len(self.inner.as_ptr()), self.capacity)
-    }
-}
-
-impl<'a, T> Cow<'a, T, Option<core::num::NonZeroUsize>>
-where
-    T: Beef + ?Sized
-{
-    // This requires nightly:
-    // https://github.com/rust-lang/rust/issues/57563
-    /// Borrowed data.
-    ///
-    /// Requires nightly. Currently not available for `beef::lean::Cow`.
-    #[cfg(feature = "const_fn")]
-    pub const fn const_borrow(val: &'a T) -> Self {
-        Cow {
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            inner: unsafe { NonNull::new_unchecked(val as *const T as *mut T) },
-            capacity: None,
-            marker: PhantomData,
-        }
     }
 }
 

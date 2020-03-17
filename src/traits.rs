@@ -1,25 +1,26 @@
 pub(crate) use internal::Capacity;
 pub(crate) use internal::Beef;
 
-mod internal {
+pub(crate) mod internal {
     use alloc::borrow::ToOwned;
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::mem::ManuallyDrop;
     use core::ptr::NonNull;
 
-    pub trait Capacity: Copy {
+    pub trait Capacity {
+        type Field: Copy;
         type NonZero: Copy;
 
         fn as_ref<T>(ptr: *const [T]) -> *const [T];
 
-        fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Self);
+        fn empty<T>(ptr: *mut T, len: usize) -> (*mut [T], Self::Field);
 
-        fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Self);
+        fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Self::Field);
 
         fn unpack(len: usize, capacity: Self::NonZero) -> (usize, usize);
 
-        fn maybe(len: usize, capacity: Self) -> Option<Self::NonZero>;
+        fn maybe(len: usize, capacity: Self::Field) -> Option<Self::NonZero>;
     }
 
     /// Helper trait required by `Cow<T>` to extract capacity of owned
@@ -33,7 +34,7 @@ mod internal {
     pub unsafe trait Beef: ToOwned {
         fn len(ptr: *const Self) -> usize;
 
-        fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
+        fn ref_into_parts<U>(&self) -> (NonNull<Self>, U::Field)
         where
             U: Capacity;
 
@@ -43,7 +44,7 @@ mod internal {
 
         /// Convert `T::Owned` to `NonNull<T>` and capacity.
         /// Return `None` for `0` capacity.
-        fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self>, U)
+        fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self>, U::Field)
         where
             U: Capacity;
 
@@ -61,7 +62,7 @@ mod internal {
         }
 
         #[inline]
-        fn ref_into_parts<U>(&self) -> (NonNull<str>, U)
+        fn ref_into_parts<U>(&self) -> (NonNull<str>, U::Field)
         where
             U: Capacity
         {
@@ -83,7 +84,7 @@ mod internal {
         }
 
         #[inline]
-        fn owned_into_parts<U>(owned: String) -> (NonNull<str>, U)
+        fn owned_into_parts<U>(owned: String) -> (NonNull<str>, U::Field)
         where
             U: Capacity,
         {
@@ -115,7 +116,7 @@ mod internal {
         }
 
         #[inline]
-        fn ref_into_parts<U>(&self) -> (NonNull<Self>, U)
+        fn ref_into_parts<U>(&self) -> (NonNull<Self>, U::Field)
         where
             U: Capacity
         {
@@ -137,7 +138,7 @@ mod internal {
         }
 
         #[inline]
-        fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<[T]>, U)
+        fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<[T]>, U::Field)
         where
             U: Capacity,
         {
