@@ -14,7 +14,7 @@ use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 ///
-/// This type is using a generic `U: Capacity`. Use either `beef::Cow` or `beef::lean::Cow` in your code.
+/// This type is using a generic `U: Capacity`. Use either [`beef::Cow`](../type.Cow.html) or [`beef::lean::Cow`](../lean/type.Cow.html) in your code.
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     inner: NonNull<T>,

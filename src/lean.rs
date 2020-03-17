@@ -9,7 +9,7 @@ use crate::traits::Capacity;
 ///
 /// # Panics
 ///
-/// `Cow::owned` will panic if capacity is larger than overflows `u32::max_size()`. Use the
+/// [`Cow::owned`](../generic/struct.Cow.html#method.owned) will panic if capacity is larger than overflows `u32::max_size()`. Use the
 /// top level `beef::Cow` if you wish to avoid this problem.
 pub type Cow<'a, T> = crate::generic::Cow<'a, T, Lean>;
 
