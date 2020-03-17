@@ -14,6 +14,10 @@ categories = ["no-std", "memory-management"]
 [features]
 default = []
 
+# adds `Cow::const_borrow` as a const fn
+# requires nightly: https://github.com/rust-lang/rust/issues/57563
+const_fn = []
+
 [profile.bench]
 opt-level = 3
 debug = false
