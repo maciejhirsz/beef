@@ -80,9 +80,9 @@ which has a further advantage of it being just a fat pointer.
 beef::Cow        | Pointer   | Length    | Capacity? |
                  +-----------+-----------+-----------+
 
-                 +-----------+-----+-----+
+                 +-----------+-----------+
 beef::lean::Cow  | Pointer   | Cap | Len |
-                 +-----------+-----+-----+
+                 +-----------+-----------+
 ```
 
 Any owned `Vec` or `String` that has 0 capacity is effectively treated as a borrowed
