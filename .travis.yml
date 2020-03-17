@@ -11,6 +11,10 @@ matrix:
         - rustup target add thumbv6m-none-eabi
       script:
         - cargo build --target thumbv6m-none-eabi --verbose
+    - rust: nightly
+      name: "nightly all features"
+      script:
+        - cargo build --all-features
 jobs:
   allow_failures:
     - rust: nightly
