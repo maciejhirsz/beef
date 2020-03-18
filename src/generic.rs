@@ -89,6 +89,20 @@ where
     }
 
     /// Returns `true` if data is borrowed or had no capacity.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use beef::Cow;
+    ///
+    /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
+    /// let no_capacity: Cow<str> = Cow::owned(String::new());
+    /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
+    ///
+    /// assert_eq!(borrowed.is_borrowed(), true);
+    /// assert_eq!(no_capacity.is_borrowed(), true);
+    /// assert_eq!(owned.is_borrowed(), false);
+    /// ```
     #[inline]
     pub fn is_borrowed(&self) -> bool {
         self.capacity().is_none()
@@ -104,9 +118,11 @@ where
     /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
     /// let no_capacity: Cow<str> = Cow::owned(String::new());
     /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
+    ///
+    /// assert_eq!(borrowed.is_owned(), false);
+    /// assert_eq!(no_capacity.is_owned(), false);
+    /// assert_eq!(owned.is_owned(), true);
     /// ```
-    ///
-    ///
     #[inline]
     pub fn is_owned(&self) -> bool {
         self.capacity().is_some()
