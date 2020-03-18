@@ -1,6 +1,6 @@
 [package]
 name = "beef"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Maciej Hirsz <hello@maciej.codes>"]
 edition = "2018"
 description = "More compact Cow"
@@ -21,7 +21,8 @@ serde_json = "1.0"
 [features]
 default = []
 
-# adds `Cow::const_borrow` as a const fn
+# adds `Cow::const_str` and `Cow::const_slice`, which are const fn
+# alternatives for creating &str and &[T] borrows
 # requires nightly: https://github.com/rust-lang/rust/issues/57563
 const_fn = []
 
