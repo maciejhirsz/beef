@@ -164,12 +164,16 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
-        #[cfg_attr(miri, ignore)]
         fn stress_test_owned() {
             let mut expected = String::from("Hello... ");
             let mut cow: Cow<str> = Cow::borrowed("Hello... ");
 
-            for i in 0..1024 {
+            #[cfg(not(miri))]
+            let iterations = 1024;
+            #[cfg(miri)]
+            let iterations = 10;
+
+            for i in 0..iterations {
                 if i % 3 == 0 {
                     let old = cow;
                     cow = old.clone();
