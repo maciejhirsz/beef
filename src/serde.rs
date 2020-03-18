@@ -32,7 +32,7 @@ where
     }
 }
 
-#[cfg(all(test, not(miri)))]
+#[cfg(test)]
 mod tests {
     use serde_derive::{Serialize, Deserialize};
 
