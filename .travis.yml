@@ -15,6 +15,10 @@ matrix:
       name: "nightly all features"
       script:
         - cargo build --all-features
+    - rust: nightly
+      name: "Miri"
+      script:
+        - ci/miri.sh
 jobs:
   allow_failures:
     - rust: nightly
