@@ -26,7 +26,7 @@ assert_eq!(
 There are two versions of `Cow` exposed by this crate:
 
 + `beef::Cow` is 3 words wide: pointer, length, and capacity. It stores the ownership tag in capacity.
-+ `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
++ `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in one word.
 
 Both versions are leaner than the `std::borrow::Cow`:
 
@@ -72,8 +72,7 @@ Owned:    | Tag       | Pointer   | Length    | Capacity  |
 Instead of being an enum with a tag, `beef::Cow` uses capacity to determine whether the
 value it's holding is owned (capacity is greater than 0), or borrowed (capacity is 0).
 
-`beef::lean::Cow` goes even further and puts length and capacity on a single 64 word,
-which has a further advantage of it being just a fat pointer.
+`beef::lean::Cow` goes even further and puts length and capacity on a single 64 word.
 
 ```text
                  +-----------+-----------+-----------+

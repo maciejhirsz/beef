@@ -19,7 +19,7 @@
 //! There are two versions of `Cow` exposed by this crate:
 //!
 //! + `beef::Cow` is 3 words wide: pointer, length, and capacity. It stores the ownership tag in capacity.
-//! + `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in a fat pointer.
+//! + `beef::lean::Cow` is 2 words wide, storing length, capacity, and the ownership tag all in one word.
 //!
 //! Both versions are leaner than the `std::borrow::Cow`:
 //!
