@@ -41,9 +41,18 @@ extern crate alloc;
 mod fat;
 mod traits;
 
+#[cfg(feature = "impl_serde")]
+mod serde;
+
 #[cfg(target_pointer_width = "64")]
 pub mod lean;
 pub mod generic;
+
+#[cfg(not(target_pointer_width = "64"))]
+pub mod lean {
+    /// Re-exports 3-word Cow for non-64-bit targets
+    pub use fat::Cow;
+}
 
 pub use fat::Cow;
 
