@@ -79,10 +79,10 @@ mod tests {
 
         for i in 0..1024 {
             if i % 3 == 0 {
-                let mut old = std::mem::ManuallyDrop::new(cow);
-                cow = (*old).clone();
+                let mut old = cow;
+                cow = old.clone();
 
-                unsafe { std::mem::ManuallyDrop::drop(&mut old); }
+                std::mem::drop(old);
             }
 
             let mut owned = cow.into_owned();

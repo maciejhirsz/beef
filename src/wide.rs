@@ -53,7 +53,10 @@ mod tests {
 
         for i in 0..1024 {
             if i % 3 == 0 {
-                cow = cow.clone();
+                let mut old = cow;
+                cow = old.clone();
+
+                std::mem::drop(old);
             }
 
             let mut owned = cow.into_owned();
