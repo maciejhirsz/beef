@@ -2,19 +2,32 @@ language: rust
 
 matrix:
   include:
+    # Stable
     - rust: stable
-    - rust: beta
-    - rust: nightly
+    - rust: stable
+      name: "stable all features (sans const_fn)"
+      script:
+          -cargo test --features impl_serde
+
+    # Stable no_std
     - rust: stable
       name: "no_std stable"
       install:
         - rustup target add thumbv6m-none-eabi
       script:
         - cargo build --target thumbv6m-none-eabi --verbose
+
+    # Beta
+    - rust: beta
+
+    # Nightly
+    - rust: nightly
     - rust: nightly
       name: "nightly all features"
       script:
-        - cargo build --all-features
+        - cargo test --all-features --verbose
+
+    # Miri
     - rust: nightly
       name: "Miri"
       script:
