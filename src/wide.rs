@@ -1,4 +1,5 @@
 use core::num::NonZeroUsize;
+use core::ptr::slice_from_raw_parts_mut;
 use crate::traits::Capacity;
 
 /// Compact three word `Cow` that puts the ownership tag in capacity.
@@ -16,18 +17,18 @@ impl Capacity for Wide {
     type NonZero = NonZeroUsize;
 
     #[inline]
-    fn len(fat: usize) -> usize {
-        fat
+    fn make_valid<T>(ptr: *const [()]) -> *const [T] {
+        ptr as *const [T]
     }
 
     #[inline]
-    fn empty(len: usize) -> (usize, Self::Field) {
-        (len, None)
+    fn empty<T>(ptr: *const [T]) -> (*mut [()], Self::Field) {
+        (ptr as *const [()] as *mut [()], None)
     }
 
     #[inline]
-    fn store(len: usize, capacity: usize) -> (usize, Self::Field) {
-        (len, NonZeroUsize::new(capacity))
+    fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [()], Self::Field) {
+        (slice_from_raw_parts_mut(ptr as *mut (), len), NonZeroUsize::new(capacity))
     }
 
     #[inline]

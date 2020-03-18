@@ -8,27 +8,16 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
-use core::ptr::NonNull;
 
-use crate::traits::{Beef, Capacity};
+use crate::traits::{Inner, Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 ///
 /// This type is using a generic `U: Capacity`. Use either [`beef::Cow`](../type.Cow.html) or [`beef::lean::Cow`](../lean/type.Cow.html) in your code.
 #[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
-    /// Pointer to data
-    ptr: NonNull<T::PointerT>,
-
-    /// This usize contains length, but it may contain other
-    /// information pending on impl of `Capacity`, and must therefore
-    /// always go through `U::len` or `U::unpack`
-    fat: usize,
-
-    /// Capacity field. For `beef::lean::Cow` this is 0-sized!
-    cap: U::Field,
-
-    /// Lifetime marker
+    inner: Inner,
+    capacity: U::Field,
     marker: PhantomData<&'a T>,
 }
 
@@ -48,9 +37,13 @@ where
     /// ```
     #[inline]
     pub fn owned(val: T::Owned) -> Self {
-        let (ptr, fat, cap) = T::owned_into_parts::<U>(val);
+        let (inner, capacity) = T::owned_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            inner,
+            capacity,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -70,9 +63,13 @@ where
     /// ```
     #[inline]
     pub fn borrowed(val: &'a T) -> Self {
-        let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
+        let (inner, capacity) = T::ref_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            inner,
+            capacity,
+            marker: PhantomData,
+        }
     }
 
     /// Extracts the owned data.
@@ -83,26 +80,12 @@ where
         let cow = ManuallyDrop::new(self);
 
         match cow.capacity() {
-            Some(capacity) => unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) },
-            None => unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }.to_owned(),
+            Some(capacity) => unsafe { T::owned_from_parts::<U>(cow.inner, capacity) },
+            None => unsafe { &*T::ref_from_parts::<U>(cow.inner) }.to_owned(),
         }
     }
 
     /// Returns `true` if data is borrowed or had no capacity.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use beef::Cow;
-    ///
-    /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
-    /// let no_capacity: Cow<str> = Cow::owned(String::new());
-    /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
-    ///
-    /// assert_eq!(borrowed.is_borrowed(), true);
-    /// assert_eq!(no_capacity.is_borrowed(), true);
-    /// assert_eq!(owned.is_borrowed(), false);
-    /// ```
     #[inline]
     pub fn is_borrowed(&self) -> bool {
         self.capacity().is_none()
@@ -118,25 +101,25 @@ where
     /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
     /// let no_capacity: Cow<str> = Cow::owned(String::new());
     /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
-    ///
-    /// assert_eq!(borrowed.is_owned(), false);
-    /// assert_eq!(no_capacity.is_owned(), false);
-    /// assert_eq!(owned.is_owned(), true);
     /// ```
+    ///
+    ///
     #[inline]
     pub fn is_owned(&self) -> bool {
         self.capacity().is_some()
     }
 
-    /// Internal convenience method for casting `ptr` into a `&T`
+    /// Internal convenience method for casting `inner` into a `&T`
     #[inline]
     fn borrow(&self) -> &T {
-        unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
+        unsafe { &*T::ref_from_parts::<U>(self.inner) }
     }
 
     #[inline]
     fn capacity(&self) -> Option<U::NonZero> {
-        U::maybe(self.fat, self.cap)
+        let len = unsafe { (*self.inner.as_ptr()).len() };
+
+        U::maybe(len, self.capacity)
     }
 }
 
@@ -149,11 +132,8 @@ impl<'a> Cow<'a, str, crate::wide::internal::Wide> {
     #[cfg(feature = "const_fn")]
     pub const fn const_str(val: &'a str) -> Self {
         Cow {
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut u8) },
-            fat: val.len(),
-            cap: None,
+            inner: unsafe { Inner::new_unchecked(val as *const str as *const [()] as *mut [()]) },
+            capacity: None,
             marker: PhantomData,
         }
     }
@@ -171,11 +151,8 @@ where
     /// Requires nightly. Currently not available for `beef::lean::Cow`.
     pub const fn const_slice(val: &'a [T]) -> Self {
         Cow {
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut T) },
-            fat: val.len(),
-            cap: None,
+            inner: unsafe { Inner::new_unchecked(val as *const [T] as *const [()] as *mut [()]) },
+            capacity: None,
             marker: PhantomData,
         }
     }
@@ -232,7 +209,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if let Some(capacity) = self.capacity() {
-            unsafe { T::owned_from_parts::<U>(self.ptr, self.fat, capacity) };
+            unsafe { T::owned_from_parts::<U>(self.inner, capacity) };
         }
     }
 }
@@ -310,8 +287,8 @@ where
         let cow = ManuallyDrop::new(cow);
 
         match cow.capacity() {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) }),
-            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }),
+            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.inner, capacity) }),
+            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.inner) }),
         }
     }
 }
@@ -330,8 +307,8 @@ where
 }
 
 macro_rules! impl_eq {
-    ($($(@for< $bounds:tt >)? $ptr:ty => $([$($deref:tt)+])? <$with:ty>,)*) => {$(
-        impl<U $(, $bounds)*> PartialEq<$with> for Cow<'_, $ptr, U>
+    ($($(@for< $bounds:tt >)? $inner:ty => $([$($deref:tt)+])? <$with:ty>,)*) => {$(
+        impl<U $(, $bounds)*> PartialEq<$with> for Cow<'_, $inner, U>
         where
             U: Capacity,
             $( $bounds: Clone + PartialEq, )*
@@ -342,13 +319,13 @@ macro_rules! impl_eq {
             }
         }
 
-        impl<U $(, $bounds)*> PartialEq<Cow<'_, $ptr, U>> for $with
+        impl<U $(, $bounds)*> PartialEq<Cow<'_, $inner, U>> for $with
         where
             U: Capacity,
             $( $bounds: Clone + PartialEq, )*
         {
             #[inline]
-            fn eq(&self, other: &Cow<$ptr, U>) -> bool {
+            fn eq(&self, other: &Cow<$inner, U>) -> bool {
                 $($($deref)*)* self == other.borrow()
             }
         }

@@ -1,5 +1,6 @@
 //! Namespace containing the 2-word `Cow` implementation.
 
+use core::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 use crate::traits::Capacity;
 
 /// Faster, 2-word `Cow`. This version is available only on 64-bit architecture,
@@ -26,24 +27,34 @@ impl Capacity for Lean {
     type NonZero = Lean;
 
     #[inline]
-    fn len(fat: usize) -> usize {
-        fat & MASK_LO
+    fn make_valid<T>(ptr: *const [()]) -> *const [T] {
+        let fat = unsafe { (*ptr).len() };
+
+        slice_from_raw_parts(ptr as *const () as *const T, fat & MASK_LO)
     }
 
     #[inline]
-    fn empty(len: usize) -> (usize, Lean) {
-        (len & MASK_LO, Lean)
+    fn empty<T>(ptr: *const [T]) -> (*mut [()], Self::Field) {
+        let len = unsafe { (*ptr).len() };
+
+        (
+            slice_from_raw_parts_mut(
+                ptr as *const T as *const () as *mut (),
+                len & MASK_LO,
+            ),
+            Lean
+        )
     }
 
     #[inline]
-    fn store(len: usize, capacity: usize) -> (usize, Lean) {
+    fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [()], Self::Field) {
         if capacity & MASK_HI != 0 {
             panic!("beef::lean::Cow: Capacity out of bounds");
         }
 
         let fat = (len & MASK_LO) | ((capacity & MASK_LO) << 32);
 
-        (fat, Lean)
+        (slice_from_raw_parts_mut(ptr as *mut (), fat), Lean)
     }
 
     #[inline]
