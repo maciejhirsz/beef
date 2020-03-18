@@ -38,7 +38,7 @@
 #![cfg_attr(not(test), no_std)]
 extern crate alloc;
 
-mod fat;
+mod wide;
 mod traits;
 
 #[cfg(feature = "impl_serde")]
@@ -51,10 +51,10 @@ pub mod generic;
 #[cfg(not(target_pointer_width = "64"))]
 pub mod lean {
     /// Re-exports 3-word Cow for non-64-bit targets
-    pub use fat::Cow;
+    pub use super::wide::Cow;
 }
 
-pub use fat::Cow;
+pub use wide::Cow;
 
 #[cfg(test)]
 mod tests {
