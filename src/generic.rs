@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<'a, T> Cow<'a, T, crate::fat::internal::Wide>
+impl<'a, T> Cow<'a, T, crate::wide::internal::Wide>
 where
     T: crate::traits::internal::Beef + ?Sized
 {
