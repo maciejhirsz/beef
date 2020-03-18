@@ -164,6 +164,7 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn stress_test_owned() {
             let mut expected = String::from("Hello... ");
             let mut cow: Cow<str> = Cow::borrowed("Hello... ");
