@@ -4,10 +4,9 @@ matrix:
   include:
     # Stable
     - rust: stable
-    - rust: stable
-      name: "stable all features (sans const_fn)"
       script:
-          -cargo test --features impl_serde
+        - cargo test --verbose
+        - cargo test --features impl_serde --verbose
 
     # Stable no_std
     - rust: stable
@@ -19,12 +18,14 @@ matrix:
 
     # Beta
     - rust: beta
+      script:
+        - cargo test --verbose
+        - cargo test --features impl_serde --verbose
 
     # Nightly
     - rust: nightly
-    - rust: nightly
-      name: "nightly all features"
       script:
+        - cargo test --verbose
         - cargo test --all-features --verbose
 
     # Miri
