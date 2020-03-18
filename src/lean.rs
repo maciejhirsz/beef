@@ -20,7 +20,7 @@ mod internal {
 use internal::Lean;
 
 const MASK_LO: usize = u32::max_value() as usize;
-const MASK_HI: usize = !u32::max_value() as usize;
+const MASK_HI: usize = !(u32::max_value() as usize);
 
 impl Capacity for Lean {
     type Field = Lean;
@@ -40,14 +40,14 @@ impl Capacity for Lean {
 
     #[inline]
     fn store<T>(ptr: *mut T, len: usize, capacity: usize) -> (*mut [T], Lean) {
-        if capacity > MASK_LO {
+        if capacity & MASK_HI != 0 {
             panic!("beef::lean::Cow: Capacity out of bounds");
         }
 
         (
             slice_from_raw_parts_mut(
                 ptr,
-                (len & MASK_LO) | ((capacity & MASK_HI) << 32),
+                (len & MASK_LO) | ((capacity & MASK_LO) << 32),
             ),
             Lean,
         )
@@ -79,7 +79,10 @@ mod tests {
 
         for i in 0..1024 {
             if i % 3 == 0 {
-                cow = cow.clone();
+                let mut old = std::mem::ManuallyDrop::new(cow);
+                cow = (*old).clone();
+
+                unsafe { std::mem::ManuallyDrop::drop(&mut old); }
             }
 
             let mut owned = cow.into_owned();

@@ -41,3 +41,29 @@ impl Capacity for Wide {
         capacity
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Cow;
+
+    #[test]
+    fn stress_test_owned() {
+        let mut expected = String::from("Hello... ");
+        let mut cow: Cow<str> = Cow::borrowed("Hello... ");
+
+        for i in 0..1024 {
+            if i % 3 == 0 {
+                cow = cow.clone();
+            }
+
+            let mut owned = cow.into_owned();
+
+            expected.push_str("Hello?.. ");
+            owned.push_str("Hello?.. ");
+
+            cow = owned.into();
+        }
+
+        assert_eq!(expected, cow.into_owned());
+    }
+}

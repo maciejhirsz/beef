@@ -100,7 +100,7 @@ pub(crate) mod internal {
         where
             U: Capacity,
         {
-            let len = (*inner.as_ptr()).len();
+            let len = (&*inner.as_ptr()).len();
             let (len, cap) = U::unpack(len, capacity);
 
             String::from_utf8_unchecked(
@@ -154,7 +154,7 @@ pub(crate) mod internal {
         where
             U: Capacity,
         {
-            let len = (*inner.as_ptr()).len();
+            let len = (&*inner.as_ptr()).len();
             let (len, cap) = U::unpack(len, capacity);
 
             Vec::from_raw_parts(inner.cast().as_ptr(), len, cap)
