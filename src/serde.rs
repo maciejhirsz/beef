@@ -32,7 +32,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use serde_derive::{Serialize, Deserialize};
 
@@ -42,9 +42,7 @@ mod tests {
 
         #[derive(Serialize, Deserialize)]
         struct Test<'a> {
-            // TODO: this attribute does faux specialization for std::borrow::Cow.
-            // See: https://github.com/serde-rs/serde/pull/1754
-            // #[serde(borrow)]
+            #[serde(borrow)]
             foo: Cow<'a, str>,
             bar: Cow<'a, str>,
         }
@@ -54,6 +52,9 @@ mod tests {
 
         assert_eq!(test.foo, "Hello");
         assert_eq!(test.bar, "\tWorld!");
+
+        assert!(test.foo.is_borrowed());
+        assert!(test.bar.is_owned());
 
         let out = serde_json::to_string(&test).unwrap();
 

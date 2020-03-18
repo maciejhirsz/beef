@@ -12,10 +12,10 @@ keywords = ["cow", "borrow", "str", "slice"]
 categories = ["no-std", "memory-management"]
 
 [dependencies]
-serde = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
+serde = { version = "1.0.105", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
-serde_derive = "1.0"
+serde_derive = "1.0.105"
 serde_json = "1.0"
 
 [features]
