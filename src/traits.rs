@@ -58,7 +58,7 @@ pub(crate) mod internal {
     unsafe impl Beef for str {
         #[inline]
         fn len(ptr: *const str) -> usize {
-            unsafe { (&*ptr).len() }
+            unsafe { (*ptr).len() }
         }
 
         #[inline]
