@@ -9,5 +9,4 @@ rustup default "$MIRI_NIGHTLY"
 rustup component add miri
 cargo miri setup
 
-# FIXME: investigate memory leaks
-cargo miri test --all-features -- -Zmiri-ignore-leaks
+cargo miri test --all-features
