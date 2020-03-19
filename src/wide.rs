@@ -1,5 +1,5 @@
-use core::num::NonZeroUsize;
 use crate::traits::Capacity;
+use core::num::NonZeroUsize;
 
 /// Compact three word `Cow` that puts the ownership tag in capacity.
 /// This is a type alias, for documentation see [`beef::generic::Cow`](./generic/struct.Cow.html).
