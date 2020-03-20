@@ -102,7 +102,7 @@ where
     ///
     /// Panics: If the Beef is owned.
     #[inline]
-    pub fn as_borrowed(self) -> &'a T {
+    pub fn unwrap_borrowed(self) -> &'a T {
         let cow = ManuallyDrop::new(self);
         if cow.capacity().is_some() {
             panic!("Can not turn owned Beef into a borrowed value")
