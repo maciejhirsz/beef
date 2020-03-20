@@ -98,6 +98,18 @@ where
         }
     }
 
+    /// Extracts borrowed data.
+    ///
+    /// Panics: If the Beef is owned.
+    #[inline]
+    pub fn as_borrowed(self) -> &'a T {
+        let cow = ManuallyDrop::new(self);
+        if cow.capacity().is_some() {
+            panic!("Can not turn owned Beef into a borrowed value")
+        }
+        unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }
+    }
+
     /// Returns `true` if data is borrowed or had no capacity.
     ///
     /// # Example
