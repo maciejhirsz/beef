@@ -50,7 +50,12 @@ where
     pub fn owned(val: T::Owned) -> Self {
         let (ptr, fat, cap) = T::owned_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -72,7 +77,12 @@ where
     pub fn borrowed(val: &'a T) -> Self {
         let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
+        }
     }
 
     /// Extracts the owned data.
@@ -310,7 +320,9 @@ where
         let cow = ManuallyDrop::new(cow);
 
         match cow.capacity() {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) }),
+            Some(capacity) => {
+                StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) })
+            }
             None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }),
         }
     }
