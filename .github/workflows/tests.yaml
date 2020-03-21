@@ -10,7 +10,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-          override: true
       - name: Run miri
         run: ci/miri.sh    
   tests:
