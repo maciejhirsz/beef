@@ -50,7 +50,12 @@ where
     pub fn owned(val: T::Owned) -> Self {
         let (ptr, fat, cap) = T::owned_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -72,7 +77,12 @@ where
     pub fn borrowed(val: &'a T) -> Self {
         let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
 
-        Cow { ptr, fat, cap, marker: PhantomData }
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
+        }
     }
 
     /// Extracts the owned data.
@@ -86,6 +96,18 @@ where
             Some(capacity) => unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) },
             None => unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }.to_owned(),
         }
+    }
+
+    /// Extracts borrowed data.
+    ///
+    /// Panics: If the Beef is owned.
+    #[inline]
+    pub fn unwrap_borrowed(self) -> &'a T {
+        let cow = ManuallyDrop::new(self);
+        if cow.capacity().is_some() {
+            panic!("Can not turn owned Beef into a borrowed value")
+        }
+        unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }
     }
 
     /// Returns `true` if data is borrowed or had no capacity.
@@ -310,7 +332,9 @@ where
         let cow = ManuallyDrop::new(cow);
 
         match cow.capacity() {
-            Some(capacity) => StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) }),
+            Some(capacity) => {
+                StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) })
+            }
             None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }),
         }
     }
