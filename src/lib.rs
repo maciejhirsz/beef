@@ -164,6 +164,21 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
+        fn unwrap_borrowed() {
+            let borrowed = Cow::borrowed("Hello");
+
+            assert_eq!(borrowed.unwrap_borrowed(), "Hello");
+        }
+
+        #[test]
+        #[should_panic]
+        fn unwrap_owned() {
+            let borrowed: Cow<str> = Cow::owned("Hello".to_string());
+
+            borrowed.unwrap_borrowed();
+        }
+
+        #[test]
         fn stress_test_owned() {
             let mut expected = String::from("Hello... ");
             let mut cow: Cow<str> = Cow::borrowed("Hello... ");
