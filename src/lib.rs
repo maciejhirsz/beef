@@ -34,19 +34,18 @@
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
-
 #![cfg_attr(not(test), no_std)]
 extern crate alloc;
 
-mod wide;
 mod traits;
+mod wide;
 
 #[cfg(feature = "impl_serde")]
 mod serde;
 
+pub mod generic;
 #[cfg(target_pointer_width = "64")]
 pub mod lean;
-pub mod generic;
 
 #[cfg(not(target_pointer_width = "64"))]
 pub mod lean {
@@ -56,6 +55,7 @@ pub mod lean {
 
 pub use wide::Cow;
 
+#[rustfmt::skip]
 macro_rules! test { ($tmod:ident => $cow:path) => {
     #[cfg(test)]
     mod $tmod {

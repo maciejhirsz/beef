@@ -1,12 +1,12 @@
-pub(crate) use internal::Capacity;
 pub(crate) use internal::Beef;
+pub(crate) use internal::Capacity;
 
 pub(crate) mod internal {
     use alloc::borrow::ToOwned;
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::mem::ManuallyDrop;
-    use core::ptr::{NonNull, slice_from_raw_parts};
+    use core::ptr::{slice_from_raw_parts, NonNull};
 
     pub trait Capacity {
         type Field: Copy;
@@ -50,7 +50,11 @@ pub(crate) mod internal {
 
         /// Rebuild `T::Owned` from `NonNull<T>` and `capacity`. This can be done by the likes
         /// of [`Vec::from_raw_parts`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.from_raw_parts).
-        unsafe fn owned_from_parts<U>(ptr: NonNull<Self::PointerT>, fat: usize, capacity: U::NonZero) -> Self::Owned
+        unsafe fn owned_from_parts<U>(
+            ptr: NonNull<Self::PointerT>,
+            fat: usize,
+            capacity: U::NonZero,
+        ) -> Self::Owned
         where
             U: Capacity;
     }
@@ -61,7 +65,7 @@ pub(crate) mod internal {
         #[inline]
         fn ref_into_parts<U>(&self) -> (NonNull<u8>, usize, U::Field)
         where
-            U: Capacity
+            U: Capacity,
         {
             let (fat, cap) = U::empty(self.len());
 
@@ -69,13 +73,17 @@ pub(crate) mod internal {
             //
             // We are casting *const T to *mut T, however for all borrowed values
             // this raw pointer is only ever dereferenced back to &T.
-            (unsafe { NonNull::new_unchecked(self.as_ptr() as *mut u8) }, fat, cap)
+            (
+                unsafe { NonNull::new_unchecked(self.as_ptr() as *mut u8) },
+                fat,
+                cap,
+            )
         }
 
         #[inline]
         unsafe fn ref_from_parts<U>(ptr: NonNull<u8>, fat: usize) -> *const str
         where
-            U: Capacity
+            U: Capacity,
         {
             slice_from_raw_parts(ptr.as_ptr(), U::len(fat)) as *const str
         }
@@ -89,7 +97,11 @@ pub(crate) mod internal {
             let mut owned = ManuallyDrop::new(owned);
             let (fat, cap) = U::store(owned.len(), owned.capacity());
 
-            (unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) }, fat, cap)
+            (
+                unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
+                fat,
+                cap,
+            )
         }
 
         #[inline]
@@ -99,9 +111,7 @@ pub(crate) mod internal {
         {
             let (len, cap) = U::unpack(fat, capacity);
 
-            String::from_utf8_unchecked(
-                Vec::from_raw_parts(ptr.as_ptr(), len, cap),
-            )
+            String::from_utf8_unchecked(Vec::from_raw_parts(ptr.as_ptr(), len, cap))
         }
     }
 
@@ -111,7 +121,7 @@ pub(crate) mod internal {
         #[inline]
         fn ref_into_parts<U>(&self) -> (NonNull<T>, usize, U::Field)
         where
-            U: Capacity
+            U: Capacity,
         {
             let (fat, cap) = U::empty(self.len());
 
@@ -119,13 +129,17 @@ pub(crate) mod internal {
             //
             // We are casting *const T to *mut T, however for all borrowed values
             // this raw pointer is only ever dereferenced back to &T.
-            (unsafe { NonNull::new_unchecked(self.as_ptr() as *mut T) }, fat, cap)
+            (
+                unsafe { NonNull::new_unchecked(self.as_ptr() as *mut T) },
+                fat,
+                cap,
+            )
         }
 
         #[inline]
         unsafe fn ref_from_parts<U>(ptr: NonNull<T>, fat: usize) -> *const [T]
         where
-            U: Capacity
+            U: Capacity,
         {
             slice_from_raw_parts(ptr.as_ptr(), U::len(fat))
         }
@@ -139,7 +153,11 @@ pub(crate) mod internal {
             let mut owned = ManuallyDrop::new(owned);
             let (fat, cap) = U::store(owned.len(), owned.capacity());
 
-            (unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) }, fat, cap)
+            (
+                unsafe { NonNull::new_unchecked(owned.as_mut_ptr()) },
+                fat,
+                cap,
+            )
         }
 
         #[inline]
