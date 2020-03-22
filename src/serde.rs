@@ -1,5 +1,5 @@
-use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use crate::generic::Cow;
 use crate::traits::internal::{Beef, Capacity};
@@ -34,7 +34,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serde_derive::{Serialize, Deserialize};
+    use serde_derive::{Deserialize, Serialize};
 
     #[test]
     fn wide_cow_de() {
