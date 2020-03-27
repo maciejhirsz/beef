@@ -41,7 +41,7 @@ impl Capacity for Lean {
             panic!("beef::lean::Cow: Capacity out of bounds");
         }
 
-        let fat = (len & MASK_LO) | ((capacity & MASK_LO) << 32);
+        let fat = ((capacity & MASK_LO) << 32) | (len & MASK_LO);
 
         (fat, Lean)
     }
