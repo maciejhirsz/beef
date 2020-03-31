@@ -10,8 +10,9 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
-use crate::wide::internal::Wide;
+#[cfg(target_pointer_width = "64")]
 use crate::lean::internal::Lean;
+use crate::wide::internal::Wide;
 use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
@@ -188,6 +189,7 @@ impl<'a> Cow<'a, str, Wide> {
     }
 }
 
+#[cfg(target_pointer_width = "64")]
 impl<'a> Cow<'a, str, Lean> {
     /// Borrowed data.
     ///
@@ -246,7 +248,7 @@ where
 
 // This requires nightly:
 // https://github.com/rust-lang/rust/issues/57563
-#[cfg(feature = "const_fn")]
+#[cfg(all(feature = "const_fn", target_pointer_width = "64"))]
 impl<'a, T> Cow<'a, [T], Lean>
 where
     T: Clone,
