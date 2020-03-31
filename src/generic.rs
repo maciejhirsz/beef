@@ -10,6 +10,8 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
+use crate::wide::internal::Wide;
+use crate::lean::internal::Lean;
 use crate::traits::{Beef, Capacity};
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
@@ -161,13 +163,19 @@ where
     }
 }
 
-// This requires nightly:
-// https://github.com/rust-lang/rust/issues/57563
-impl<'a> Cow<'a, str, crate::wide::internal::Wide> {
+impl<'a> Cow<'a, str, Wide> {
     /// Borrowed data.
     ///
-    /// Requires nightly. Currently not available for `beef::lean::Cow`.
-    #[cfg(feature = "const_fn")]
+    /// This is functionally identical to [`borrow`](./generic/struct.Cow.html#method.borrow).
+    /// We use impl specialization to allow this function to be `const`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use beef::Cow;
+    ///
+    /// const HELLO: Cow<str> = Cow::const_str("Hello");
+    /// ```
     pub const fn const_str(val: &'a str) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -180,16 +188,50 @@ impl<'a> Cow<'a, str, crate::wide::internal::Wide> {
     }
 }
 
+impl<'a> Cow<'a, str, Lean> {
+    /// Borrowed data.
+    ///
+    /// This is functionally identical to [`borrow`](./generic/struct.Cow.html#method.borrow).
+    /// We use impl specialization to allow this function to be `const`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use beef::lean::Cow;
+    ///
+    /// const HELLO: Cow<str> = Cow::const_str("Hello");
+    /// ```
+    pub const fn const_str(val: &'a str) -> Self {
+        Cow {
+            // We are casting *const T to *mut T, however for all borrowed values
+            // this raw pointer is only ever dereferenced back to &T.
+            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut u8) },
+            fat: Lean::mask_len(val.len()),
+            cap: Lean,
+            marker: PhantomData,
+        }
+    }
+}
+
 // This requires nightly:
 // https://github.com/rust-lang/rust/issues/57563
 #[cfg(feature = "const_fn")]
-impl<'a, T> Cow<'a, [T], crate::wide::internal::Wide>
+impl<'a, T> Cow<'a, [T], Wide>
 where
     T: Clone,
 {
     /// Borrowed data.
     ///
-    /// Requires nightly. Currently not available for `beef::lean::Cow`.
+    /// This is functionally identical to [`borrow`](./generic/struct.Cow.html#method.borrow).
+    /// We use impl specialization to allow this function to be `const`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use beef::Cow;
+    ///
+    /// const HELLO: Cow<[u8]> = Cow::const_slice(&[1, 2, 3]);
+    /// ```
     pub const fn const_slice(val: &'a [T]) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -197,6 +239,37 @@ where
             ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut T) },
             fat: val.len(),
             cap: None,
+            marker: PhantomData,
+        }
+    }
+}
+
+// This requires nightly:
+// https://github.com/rust-lang/rust/issues/57563
+#[cfg(feature = "const_fn")]
+impl<'a, T> Cow<'a, [T], Lean>
+where
+    T: Clone,
+{
+    /// Borrowed data.
+    ///
+    /// This i functionally identical to [`borrow`](./generic/struct.Cow.html#method.borrow).
+    /// We use impl specialization to allow this function to be `const`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use beef::lean::Cow;
+    ///
+    /// const HELLO: Cow<[u8]> = Cow::const_slice(&[1, 2, 3]);
+    /// ```
+    pub const fn const_slice(val: &'a [T]) -> Self {
+        Cow {
+            // We are casting *const T to *mut T, however for all borrowed values
+            // this raw pointer is only ever dereferenced back to &T.
+            ptr: unsafe { NonNull::new_unchecked(val.as_ptr() as *mut T) },
+            fat: Lean::mask_len(val.len()),
+            cap: Lean,
             marker: PhantomData,
         }
     }

@@ -206,6 +206,21 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
 
             assert_eq!(expected, cow.into_owned());
         }
+
+        #[test]
+        fn const_fn_str() {
+            const HELLO: Cow<str> = Cow::const_str("Hello");
+
+            assert_eq!(&*HELLO, "Hello");
+        }
+
+        #[test]
+        #[cfg(feature = "const_fn")]
+        fn const_fn_slice() {
+            const FOO: Cow<[u8]> = Cow::const_slice(b"bar");
+
+            assert_eq!(&*FOO, b"bar");
+        }
     }
 } }
 

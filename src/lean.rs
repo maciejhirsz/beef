@@ -12,7 +12,7 @@ use crate::traits::Capacity;
 /// top level `beef::Cow` if you wish to avoid this problem.
 pub type Cow<'a, T> = crate::generic::Cow<'a, T, Lean>;
 
-mod internal {
+pub(crate) mod internal {
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub struct Lean;
 }
@@ -20,6 +20,13 @@ use internal::Lean;
 
 const MASK_LO: usize = u32::max_value() as usize;
 const MASK_HI: usize = !(u32::max_value() as usize);
+
+impl Lean {
+    #[inline]
+    pub const fn mask_len(len: usize) -> usize {
+        len & MASK_LO
+    }
+}
 
 impl Capacity for Lean {
     type Field = Lean;
