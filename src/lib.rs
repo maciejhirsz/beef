@@ -156,6 +156,46 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
+        fn ord_and_partial_ord() {
+            use std::cmp::Ordering;
+
+            macro_rules! generate_order_tests {
+                ( $f:tt => $order:expr => $left:expr, $right:expr ) => {
+                    assert_eq!(
+                        Cow::<str>::borrowed($left).$f(&Cow::<str>::borrowed($right)),
+                        $order
+                    );
+
+                    assert_eq!(
+                        Cow::<str>::owned($left.to_owned())
+                            .$f(&Cow::<str>::borrowed($right)),
+                        $order
+                    );
+
+                    assert_eq!(
+                        Cow::<str>::borrowed($left)
+                            .$f(&Cow::<str>::owned($right.to_owned())),
+                        $order
+                    );
+
+                    assert_eq!(
+                        Cow::<str>::owned($left.to_owned())
+                            .$f(&Cow::<str>::owned($right.to_owned())),
+                        $order
+                    );
+                }
+            }
+
+            generate_order_tests!(partial_cmp => Some(Ordering::Equal) => "a", "a");
+            generate_order_tests!(partial_cmp => Some(Ordering::Less) => "a", "b");
+            generate_order_tests!(partial_cmp => Some(Ordering::Greater) => "b", "a");
+
+            generate_order_tests!(cmp => Ordering::Equal => "a", "a");
+            generate_order_tests!(cmp => Ordering::Less => "a", "b");
+            generate_order_tests!(cmp => Ordering::Greater => "b", "a");
+        }
+
+        #[test]
         fn from_std_cow() {
             let std = std::borrow::Cow::Borrowed("Hello World");
             let beef = Cow::from(std.clone());
