@@ -1,6 +1,6 @@
 [package]
 name = "beef"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Maciej Hirsz <hello@maciej.codes>"]
 edition = "2018"
 description = "More compact Cow"
