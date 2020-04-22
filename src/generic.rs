@@ -4,6 +4,7 @@
 use alloc::borrow::{Borrow, Cow as StdCow};
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
@@ -18,7 +19,6 @@ use crate::wide::internal::Wide;
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
 ///
 /// This type is using a generic `U: Capacity`. Use either [`beef::Cow`](../type.Cow.html) or [`beef::lean::Cow`](../lean/type.Cow.html) in your code.
-#[derive(Eq)]
 pub struct Cow<'a, T: Beef + ?Sized + 'a, U: Capacity> {
     /// Pointer to data
     ptr: NonNull<T::PointerT>,
@@ -285,6 +285,37 @@ where
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.borrow().hash(state)
+    }
+}
+
+impl<T, U> Eq for Cow<'_, T, U>
+where
+    T: Eq + Beef + ?Sized,
+    U: Capacity,
+{
+}
+
+impl<A, B, U, V> PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
+where
+    A: Beef + ?Sized + PartialOrd<B>,
+    B: Beef + ?Sized,
+    U: Capacity,
+    V: Capacity,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
+        PartialOrd::partial_cmp(self.borrow(), other.borrow())
+    }
+}
+
+impl<T, U> Ord for Cow<'_, T, U>
+where
+    T: Ord + Beef + ?Sized,
+    U: Capacity,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(self.borrow(), other.borrow())
     }
 }
 
