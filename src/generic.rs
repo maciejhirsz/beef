@@ -288,6 +288,18 @@ where
     }
 }
 
+impl<'a, T, U> Default for Cow<'a, T, U>
+where
+    T: Beef + ?Sized,
+    U: Capacity,
+    &'a T: Default,
+{
+    #[inline]
+    fn default() -> Self {
+        Cow::borrowed(Default::default())
+    }
+}
+
 impl<T, U> Eq for Cow<'_, T, U>
 where
     T: Eq + Beef + ?Sized,
