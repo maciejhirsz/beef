@@ -273,7 +273,7 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         fn default_slice() {
             let empty: Cow<[u8]> = Default::default();
 
-            assert_eq!(&*empty, &[]);
+            assert_eq!(&*empty, b"");
         }
     }
 } }
