@@ -261,6 +261,20 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
 
             assert_eq!(&*FOO, b"bar");
         }
+
+        #[test]
+        fn default_str() {
+            let empty: Cow<str> = Default::default();
+
+            assert_eq!(&*empty, "");
+        }
+
+        #[test]
+        fn default_slice() {
+            let empty: Cow<[u8]> = Default::default();
+
+            assert_eq!(&*empty, b"");
+        }
     }
 } }
 
