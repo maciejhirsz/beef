@@ -85,7 +85,7 @@ beef::lean::Cow  | Pointer   | Cap | Len |
 ```
 
 Any owned `Vec` or `String` that has 0 capacity is effectively treated as a borrowed
-value. Since having no capacity means there is no actual allocation behind the pointer
+value. Since having no capacity means there is no actual allocation behind the pointer,
 this is safe.
 
 ## Benchmarks
