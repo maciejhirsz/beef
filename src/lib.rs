@@ -32,6 +32,15 @@
 //! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
 //! assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 //! ```
+//!
+//! To use different version of `beef::Cow` depending on pointer size on different architecture.
+//!
+//! ```rust
+//! #[cfg(target_pointer_width = "64")]
+//! use beef::lean::Cow;
+//! #[cfg(not(target_pointer_width = "64")]
+//! use beef::Cow;
+//! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(missing_docs)]
 #![cfg_attr(not(test), no_std)]
