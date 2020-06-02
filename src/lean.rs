@@ -18,8 +18,8 @@ pub(crate) mod internal {
 }
 use internal::Lean;
 
-const MASK_LO: usize = u32::max_value() as usize;
-const MASK_HI: usize = !(u32::max_value() as usize);
+const MASK_LO: usize = u32::MAX as usize;
+const MASK_HI: usize = !MASK_LO;
 
 impl Lean {
     #[inline]
