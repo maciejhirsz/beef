@@ -26,7 +26,7 @@
 //! ```rust
 //! use std::mem::size_of;
 //!
-//! const WORD: usize = size_of::<usize>();
+//! const WORD: usize = size_of::<&()>();
 //!
 //! assert_eq!(size_of::<std::borrow::Cow<str>>(), 4 * WORD);
 //! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
