@@ -533,18 +533,21 @@ where
     U: Capacity,
     T: Beef + Sync + ?Sized,
     T::Owned: Sync,
-{}
+{
+}
 
 unsafe impl<T, U> Send for Cow<'_, T, U>
 where
     U: Capacity,
     T: Beef + Sync + ?Sized,
     T::Owned: Send,
-{}
+{
+}
 
 impl<T, U> Unpin for Cow<'_, T, U>
 where
     U: Capacity,
     T: Beef + ?Sized,
     T::Owned: Unpin,
-{}
+{
+}
