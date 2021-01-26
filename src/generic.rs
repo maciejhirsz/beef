@@ -528,5 +528,23 @@ where
 }
 
 // Safety: Same bounds as `std::borrow::Cow`.
-unsafe impl<T: Beef + Sync + ?Sized, U: Capacity> Sync for Cow<'_, T, U> {}
-unsafe impl<T: Beef + Send + Sync + ?Sized, U: Capacity> Send for Cow<'_, T, U> {}
+unsafe impl<T, U> Sync for Cow<'_, T, U>
+where
+    U: Capacity,
+    T: Beef + Sync + ?Sized,
+    T::Owned: Sync,
+{}
+
+unsafe impl<T, U> Send for Cow<'_, T, U>
+where
+    U: Capacity,
+    T: Beef + Sync + ?Sized,
+    T::Owned: Send,
+{}
+
+impl<T, U> Unpin for Cow<'_, T, U>
+where
+    U: Capacity,
+    T: Beef + ?Sized,
+    T::Owned: Unpin,
+{}
