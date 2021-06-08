@@ -18,7 +18,8 @@ pub(crate) mod internal {
 }
 use internal::Lean;
 
-const MASK_LO: usize = u32::MAX as usize;
+const POINTER_SIZE: usize = core::mem::size_of::<usize>() * 8;
+const MASK_LO: usize = usize::MAX >> (POINTER_SIZE / 2);
 const MASK_HI: usize = !MASK_LO;
 
 impl Lean {
