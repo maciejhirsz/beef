@@ -32,7 +32,7 @@
 //! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
 //! assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 //! ```
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
+#![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
 #![warn(missing_docs)]
 #![cfg_attr(not(test), no_std)]
 extern crate alloc;
