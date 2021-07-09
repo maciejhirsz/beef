@@ -30,6 +30,9 @@
 //!
 //! assert_eq!(size_of::<std::borrow::Cow<str>>(), 4 * WORD);
 //! assert_eq!(size_of::<beef::Cow<str>>(), 3 * WORD);
+//!
+//! // Lean variant is two words on 64-bit architecture
+//! #[cfg(target_pointer_width = "64")]
 //! assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
