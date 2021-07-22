@@ -1,4 +1,4 @@
-use alloc::{string::String, borrow::ToOwned};
+use alloc::{borrow::ToOwned, string::String};
 use core::{fmt, marker::PhantomData};
 
 use serde::de::{self, Deserialize, Deserializer, Visitor};
@@ -20,7 +20,9 @@ where
     }
 }
 
-struct CowVisitor<'de, 'a, T: Beef + ?Sized, U: Capacity>(PhantomData<fn() -> (&'de T, Cow<'a, T, U>)>);
+struct CowVisitor<'de, 'a, T: Beef + ?Sized, U: Capacity>(
+    PhantomData<fn() -> (&'de T, Cow<'a, T, U>)>,
+);
 
 impl<'de, 'a, U> Visitor<'de> for CowVisitor<'de, 'a, str, U>
 where
