@@ -42,6 +42,7 @@ extern crate alloc;
 
 mod traits;
 mod wide;
+mod error;
 
 #[cfg(feature = "impl_serde")]
 mod serde;
@@ -57,12 +58,14 @@ pub mod lean {
 }
 
 pub use wide::Cow;
+pub use error::OwnedVariantError;
 
 #[rustfmt::skip]
 macro_rules! test { ($tmod:ident => $cow:path) => {
     #[cfg(test)]
     mod $tmod {
         use $cow;
+        use core::convert::TryFrom;
 
         #[test]
         fn borrowed_str() {
@@ -277,6 +280,15 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
             let empty: Cow<[u8]> = Default::default();
 
             assert_eq!(&*empty, b"");
+        }
+
+        #[test]
+        fn try_from_slice() {
+            let cow: Cow<[u8]> = Cow::borrowed(b"foobar");
+
+            let slice: Result<&[u8], _> = <&[u8]>::try_from(cow);
+
+            assert_eq!(slice, Ok(&b"foobar"[..]));
         }
     }
 } }

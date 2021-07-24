@@ -5,6 +5,7 @@ use alloc::borrow::{Borrow, Cow as StdCow};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+use core::convert::TryFrom;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
@@ -360,6 +361,56 @@ where
     #[inline]
     fn from(v: Vec<T>) -> Self {
         Cow::owned(v)
+    }
+}
+
+impl<'a, T, U> TryFrom<Cow<'a, [T], U>> for &'a [T]
+where
+    [T]: Beef,
+    U: Capacity,
+{
+    type Error = crate::OwnedVariantError;
+
+    fn try_from(value: Cow<'a, [T], U>) -> Result<Self, Self::Error> {
+        if value.capacity().is_some() {
+            Err(crate::OwnedVariantError)
+        } else {
+            Ok(unsafe { &*<[T] as Beef>::ref_from_parts::<U>(value.ptr, value.fat) })
+        }
+    }
+}
+
+impl<'a, U> TryFrom<Cow<'a, str, U>> for &'a str
+where
+    U: Capacity,
+{
+    type Error = crate::OwnedVariantError;
+
+    fn try_from(value: Cow<'a, str, U>) -> Result<Self, Self::Error> {
+        if value.capacity().is_some() {
+            Err(crate::OwnedVariantError)
+        } else {
+            Ok(unsafe { &*str::ref_from_parts::<U>(value.ptr, value.fat) })
+        }
+    }
+}
+
+impl<'a, T, U> From<Cow<'a, [T], U>> for Vec<T>
+where
+    [T]: Beef + alloc::borrow::ToOwned<Owned = Vec<T>>,
+    U: Capacity,
+{
+    fn from(value: Cow<'a, [T], U>) -> Self {
+        value.into_owned()
+    }
+}
+
+impl<'a, U> From<Cow<'a, str, U>> for String
+where
+    U: Capacity,
+{
+    fn from(value: Cow<'a, str, U>) -> Self {
+        value.into_owned()
     }
 }
 
