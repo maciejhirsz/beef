@@ -9,4 +9,4 @@ rustup default "$MIRI_NIGHTLY"
 rustup component add miri
 cargo miri setup
 
-cargo miri test --all-features
+MIRIFLAGS='-Zmiri-strict-provenance' cargo miri test --all-features
