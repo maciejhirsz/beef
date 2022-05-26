@@ -94,7 +94,9 @@ pub(crate) mod internal {
             U: Capacity,
         {
             // Convert to `String::into_raw_parts` once stabilized
-            let mut owned = ManuallyDrop::new(owned);
+            // We need to go through Vec here to get provenance for the entire allocation
+            // instead of just the initialized parts.
+            let mut owned = ManuallyDrop::new(owned.into_bytes());
             let (fat, cap) = U::store(owned.len(), owned.capacity());
 
             (
