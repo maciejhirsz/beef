@@ -1,5 +1,5 @@
-pub(crate) use internal::Beef;
 pub(crate) use internal::Capacity;
+pub(crate) use internal::{Beef, Steak};
 
 pub(crate) mod internal {
     use alloc::borrow::ToOwned;
@@ -23,15 +23,13 @@ pub(crate) mod internal {
         fn maybe(fat: usize, capacity: Self::Field) -> Option<Self::NonZero>;
     }
 
-    /// Helper trait required by `Cow<T>` to extract capacity of owned
-    /// variant of `T`, and manage conversions.
-    ///
-    /// This can be only implemented on types that match requirements:
-    ///
-    /// + `T::Owned` has a `capacity`, which is an extra word that is absent in `T`.
-    /// + `T::Owned` with `capacity` of `0` does not allocate memory.
-    /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
-    pub unsafe trait Beef: ToOwned {
+    // for `~const Steak`
+    // I think that Steak (cooked beef) would contain "cooked" functions
+    // (computed at compile-time)
+    // However, `Vec::new()` also has const len/cap, but `std` does not implement it
+    //
+    // fixme: add docs
+    pub unsafe trait Steak: ToOwned {
         type PointerT;
 
         fn ref_into_parts<U>(&self) -> (NonNull<Self::PointerT>, usize, U::Field)
@@ -41,7 +39,17 @@ pub(crate) mod internal {
         unsafe fn ref_from_parts<U>(ptr: NonNull<Self::PointerT>, len: usize) -> *const Self
         where
             U: Capacity;
+    }
 
+    /// Helper trait required by `Cow<T>` to extract capacity of owned
+    /// variant of `T`, and manage conversions.
+    ///
+    /// This can be only implemented on types that match requirements:
+    ///
+    /// + `T::Owned` has a `capacity`, which is an extra word that is absent in `T`.
+    /// + `T::Owned` with `capacity` of `0` does not allocate memory.
+    /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
+    pub unsafe trait Beef: Steak {
         /// Convert `T::Owned` to `NonNull<T>` and capacity.
         /// Return `None` for `0` capacity.
         fn owned_into_parts<U>(owned: Self::Owned) -> (NonNull<Self::PointerT>, usize, U::Field)
@@ -59,35 +67,75 @@ pub(crate) mod internal {
             U: Capacity;
     }
 
+    crate::cfg_fix! {
+        #[cfg(not(feature = "const_deref"))] {
+            unsafe impl Steak for str {
+                type PointerT = u8;
+
+                #[inline]
+                fn ref_into_parts<U>(&self) -> (NonNull<u8>, usize, U::Field)
+                where
+                    U: Capacity,
+                {
+                    let (fat, cap) = U::empty(self.len());
+
+                    // A note on soundness:
+                    //
+                    // We are casting *const T to *mut T, however for all borrowed values
+                    // this raw pointer is only ever dereferenced back to &T.
+                    (
+                        unsafe { NonNull::new_unchecked(self.as_ptr() as *mut u8) },
+                        fat,
+                        cap,
+                    )
+                }
+
+                #[inline]
+                unsafe fn ref_from_parts<U>(ptr: NonNull<u8>, fat: usize) -> *const str
+                where
+                    U: Capacity,
+                {
+                    slice_from_raw_parts(ptr.as_ptr(), U::len(fat)) as *const str
+                }
+            }
+        }
+    }
+
+    crate::cfg_fix! {
+        #[cfg(feature = "const_deref")] {
+            unsafe impl const Steak for str {
+                type PointerT = u8;
+
+                #[inline]
+                fn ref_into_parts<U>(&self) -> (NonNull<u8>, usize, U::Field)
+                where
+                    U: ~const Capacity,
+                {
+                    let (fat, cap) = U::empty(self.len());
+
+                    // A note on soundness:
+                    //
+                    // We are casting *const T to *mut T, however for all borrowed values
+                    // this raw pointer is only ever dereferenced back to &T.
+                    (
+                        unsafe { NonNull::new_unchecked(self.as_ptr() as *mut u8) },
+                        fat,
+                        cap,
+                    )
+                }
+
+                #[inline]
+                unsafe fn ref_from_parts<U>(ptr: NonNull<u8>, fat: usize) -> *const str
+                where
+                    U: ~const Capacity,
+                {
+                    slice_from_raw_parts(ptr.as_ptr(), U::len(fat)) as *const str
+                }
+            }
+        }
+    }
+
     unsafe impl Beef for str {
-        type PointerT = u8;
-
-        #[inline]
-        fn ref_into_parts<U>(&self) -> (NonNull<u8>, usize, U::Field)
-        where
-            U: Capacity,
-        {
-            let (fat, cap) = U::empty(self.len());
-
-            // A note on soundness:
-            //
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            (
-                unsafe { NonNull::new_unchecked(self.as_ptr() as *mut u8) },
-                fat,
-                cap,
-            )
-        }
-
-        #[inline]
-        unsafe fn ref_from_parts<U>(ptr: NonNull<u8>, fat: usize) -> *const str
-        where
-            U: Capacity,
-        {
-            slice_from_raw_parts(ptr.as_ptr(), U::len(fat)) as *const str
-        }
-
         #[inline]
         fn owned_into_parts<U>(owned: String) -> (NonNull<u8>, usize, U::Field)
         where
@@ -117,35 +165,75 @@ pub(crate) mod internal {
         }
     }
 
+    crate::cfg_fix! {
+        #[cfg(not(feature = "const_deref"))] {
+            unsafe impl<T: Clone> Steak for [T] {
+                type PointerT = T;
+
+                #[inline]
+                fn ref_into_parts<U>(&self) -> (NonNull<T>, usize, U::Field)
+                where
+                    U: Capacity,
+                {
+                    let (fat, cap) = U::empty(self.len());
+
+                    // A note on soundness:
+                    //
+                    // We are casting *const T to *mut T, however for all borrowed values
+                    // this raw pointer is only ever dereferenced back to &T.
+                    (
+                        unsafe { NonNull::new_unchecked(self.as_ptr() as *mut T) },
+                        fat,
+                        cap,
+                    )
+                }
+
+                #[inline]
+                unsafe fn ref_from_parts<U>(ptr: NonNull<T>, fat: usize) -> *const [T]
+                where
+                    U: Capacity,
+                {
+                    slice_from_raw_parts(ptr.as_ptr(), U::len(fat))
+                }
+            }
+        }
+    }
+
+    crate::cfg_fix! {
+        #[cfg(feature = "const_deref")] {
+            unsafe impl<T: Clone> const Steak for [T] {
+                type PointerT = T;
+
+                #[inline]
+                fn ref_into_parts<U>(&self) -> (NonNull<T>, usize, U::Field)
+                where
+                    U: ~const Capacity,
+                {
+                    let (fat, cap) = U::empty(self.len());
+
+                    // A note on soundness:
+                    //
+                    // We are casting *const T to *mut T, however for all borrowed values
+                    // this raw pointer is only ever dereferenced back to &T.
+                    (
+                        unsafe { NonNull::new_unchecked(self.as_ptr() as *mut T) },
+                        fat,
+                        cap,
+                    )
+                }
+
+                #[inline]
+                unsafe fn ref_from_parts<U>(ptr: NonNull<T>, fat: usize) -> *const [T]
+                where
+                    U: ~const Capacity,
+                {
+                    slice_from_raw_parts(ptr.as_ptr(), U::len(fat))
+                }
+            }
+        }
+    }
+
     unsafe impl<T: Clone> Beef for [T] {
-        type PointerT = T;
-
-        #[inline]
-        fn ref_into_parts<U>(&self) -> (NonNull<T>, usize, U::Field)
-        where
-            U: Capacity,
-        {
-            let (fat, cap) = U::empty(self.len());
-
-            // A note on soundness:
-            //
-            // We are casting *const T to *mut T, however for all borrowed values
-            // this raw pointer is only ever dereferenced back to &T.
-            (
-                unsafe { NonNull::new_unchecked(self.as_ptr() as *mut T) },
-                fat,
-                cap,
-            )
-        }
-
-        #[inline]
-        unsafe fn ref_from_parts<U>(ptr: NonNull<T>, fat: usize) -> *const [T]
-        where
-            U: Capacity,
-        {
-            slice_from_raw_parts(ptr.as_ptr(), U::len(fat))
-        }
-
         #[inline]
         fn owned_into_parts<U>(owned: Vec<T>) -> (NonNull<T>, usize, U::Field)
         where

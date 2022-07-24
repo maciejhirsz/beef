@@ -13,7 +13,7 @@ use core::ptr::NonNull;
 
 #[cfg(target_pointer_width = "64")]
 use crate::lean::internal::Lean;
-use crate::traits::{Beef, Capacity};
+use crate::traits::{Beef, Capacity, Steak};
 use crate::wide::internal::Wide;
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).
@@ -67,24 +67,57 @@ where
     T: Beef + ?Sized,
     U: Capacity,
 {
-    /// Borrowed data.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use beef::Cow;
-    ///
-    /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
-    /// ```
-    #[inline]
-    pub fn borrowed(val: &'a T) -> Self {
-        let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
+    crate::cfg_fix! {
+        #[cfg(not(feature = "const_deref"))] {
+            /// Borrowed data.
+            ///
+            /// # Example
+            ///
+            /// ```rust
+            /// use beef::Cow;
+            ///
+            /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
+            /// ```
+            ///
+            #[inline]
+            pub fn borrowed(val: &'a T) -> Self {
+                let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
 
-        Cow {
-            ptr,
-            fat,
-            cap,
-            marker: PhantomData,
+                Cow {
+                    ptr,
+                    fat,
+                    cap,
+                    marker: PhantomData,
+                }
+            }
+        }
+    }
+
+    crate::cfg_fix! {
+        #[cfg(feature = "const_deref")] {
+            /// Borrowed data.
+            ///
+            /// # Example
+            ///
+            /// ```rust
+            /// use beef::Cow;
+            ///
+            /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
+            /// ```
+            ///
+            #[inline]
+            pub const fn borrowed(val: &'a T) -> Self
+            where T: ~const Steak
+            {
+                let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
+
+                Cow {
+                    ptr,
+                    fat,
+                    cap,
+                    marker: PhantomData,
+                }
+            }
         }
     }
 
@@ -152,10 +185,24 @@ where
         self.capacity().is_some()
     }
 
-    /// Internal convenience method for casting `ptr` into a `&T`
-    #[inline]
-    fn borrow(&self) -> &T {
-        unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
+    crate::cfg_fix! {
+        #[cfg(not(feature = "const_deref"))] {
+            /// Internal convenience method for casting `ptr` into a `&T`
+            #[inline]
+            fn borrow(&self) -> &T {
+                unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
+            }
+        }
+    }
+
+    crate::cfg_fix! {
+        #[cfg(feature = "const_deref")] {
+            /// Internal convenience method for casting `ptr` into a `&T`
+            #[inline]
+            const fn borrow(&self) -> &T where T: ~const Steak {
+                unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
+            }
+        }
     }
 
     #[inline]
@@ -177,6 +224,10 @@ impl<'a> Cow<'a, str, Wide> {
     ///
     /// const HELLO: Cow<str> = Cow::const_str("Hello");
     /// ```
+    #[cfg_attr(
+        feature = "const_deref",
+        deprecated(note = "use Cow::borrowed() instead")
+    )]
     pub const fn const_str(val: &'a str) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -203,6 +254,10 @@ impl<'a> Cow<'a, str, Lean> {
     ///
     /// const HELLO: Cow<str> = Cow::const_str("Hello");
     /// ```
+    #[cfg_attr(
+        feature = "const_deref",
+        deprecated(note = "use Cow::borrowed() instead")
+    )]
     pub const fn const_str(val: &'a str) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -234,6 +289,10 @@ where
     ///
     /// const HELLO: Cow<[u8]> = Cow::const_slice(&[1, 2, 3]);
     /// ```
+    #[cfg_attr(
+        feature = "const_deref",
+        deprecated(note = "use Cow::borrowed() instead")
+    )]
     pub const fn const_slice(val: &'a [T]) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -265,6 +324,10 @@ where
     ///
     /// const HELLO: Cow<[u8]> = Cow::const_slice(&[1, 2, 3]);
     /// ```
+    #[cfg_attr(
+        feature = "const_deref",
+        deprecated(note = "use Cow::borrowed() instead")
+    )]
     pub const fn const_slice(val: &'a [T]) -> Self {
         Cow {
             // We are casting *const T to *mut T, however for all borrowed values
@@ -390,38 +453,108 @@ where
     }
 }
 
-impl<T, U> core::ops::Deref for Cow<'_, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    type Target = T;
+crate::cfg_fix! {
+    #[cfg(not(feature = "const_deref"))] {
+        impl<T, U> core::ops::Deref for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized,
+            U: Capacity,
+        {
+            type Target = T;
 
-    #[inline]
-    fn deref(&self) -> &T {
-        self.borrow()
+            #[inline]
+            fn deref(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<T, U> AsRef<T> for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized,
+            U: Capacity,
+        {
+            #[inline]
+            fn as_ref(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<T, U> Borrow<T> for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized,
+            U: Capacity,
+        {
+            #[inline]
+            fn borrow(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<A, B, U, V> PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
+        where
+            A: Beef + ?Sized,
+            B: Beef + ?Sized,
+            U: Capacity,
+            V: Capacity,
+            A: PartialEq<B>,
+        {
+            fn eq(&self, other: &Cow<B, V>) -> bool {
+                self.borrow() == other.borrow()
+            }
+        }
     }
 }
 
-impl<T, U> AsRef<T> for Cow<'_, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn as_ref(&self) -> &T {
-        self.borrow()
-    }
-}
+crate::cfg_fix! {
+    #[cfg(feature = "const_deref")] {
+        impl<T, U> const core::ops::Deref for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+        {
+            type Target = T;
 
-impl<T, U> Borrow<T> for Cow<'_, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn borrow(&self) -> &T {
-        self.borrow()
+            #[inline]
+            fn deref(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<T, U> const AsRef<T> for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+        {
+            #[inline]
+            fn as_ref(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<T, U> const Borrow<T> for Cow<'_, T, U>
+        where
+            T: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+        {
+            #[inline]
+            fn borrow(&self) -> &T {
+                self.borrow()
+            }
+        }
+
+        impl<A, B, U, V> const PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
+        where
+            A: Beef + ?Sized + ~const Steak,
+            B: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+            V: Capacity,
+            A: ~const PartialEq<B>,
+        {
+            fn eq(&self, other: &Cow<B, V>) -> bool {
+                // fixme: compile error within `a == b` context :(
+                self.borrow().eq(other.borrow())
+            }
+        }
     }
 }
 
@@ -454,19 +587,6 @@ where
             }
             None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }),
         }
-    }
-}
-
-impl<A, B, U, V> PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
-where
-    A: Beef + ?Sized,
-    B: Beef + ?Sized,
-    U: Capacity,
-    V: Capacity,
-    A: PartialEq<B>,
-{
-    fn eq(&self, other: &Cow<B, V>) -> bool {
-        self.borrow() == other.borrow()
     }
 }
 

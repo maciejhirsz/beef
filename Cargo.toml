@@ -25,6 +25,8 @@ default = []
 # generic &[T] slices.
 # requires nightly: https://github.com/rust-lang/rust/issues/57563
 const_fn = []
+# requires nightly: https://github.com/rust-lang/rust/issues/67792
+const_deref = []
 
 impl_serde = ["serde"]
 

@@ -28,42 +28,90 @@ impl Lean {
     }
 }
 
-impl Capacity for Lean {
-    type Field = Lean;
-    type NonZero = Lean;
+crate::cfg_fix! {
+    #[cfg(not(feature = "const_deref"))] {
+        impl Capacity for Lean {
+            type Field = Lean;
+            type NonZero = Lean;
 
-    #[inline]
-    fn len(fat: usize) -> usize {
-        fat & MASK_LO
-    }
+            #[inline]
+            fn len(fat: usize) -> usize {
+                fat & MASK_LO
+            }
 
-    #[inline]
-    fn empty(len: usize) -> (usize, Lean) {
-        (len & MASK_LO, Lean)
-    }
+            #[inline]
+            fn empty(len: usize) -> (usize, Lean) {
+                (len & MASK_LO, Lean)
+            }
 
-    #[inline]
-    fn store(len: usize, capacity: usize) -> (usize, Lean) {
-        if capacity & MASK_HI != 0 {
-            panic!("beef::lean::Cow: Capacity out of bounds");
+            #[inline]
+            fn store(len: usize, capacity: usize) -> (usize, Lean) {
+                if capacity & MASK_HI != 0 {
+                    panic!("beef::lean::Cow: Capacity out of bounds");
+                }
+
+                let fat = ((capacity & MASK_LO) << 32) | (len & MASK_LO);
+
+                (fat, Lean)
+            }
+
+            #[inline]
+            fn unpack(fat: usize, _: Lean) -> (usize, usize) {
+                (fat & MASK_LO, (fat & MASK_HI) >> 32)
+            }
+
+            #[inline]
+            fn maybe(fat: usize, _: Lean) -> Option<Lean> {
+                if fat & MASK_HI != 0 {
+                    Some(Lean)
+                } else {
+                    None
+                }
+            }
         }
-
-        let fat = ((capacity & MASK_LO) << 32) | (len & MASK_LO);
-
-        (fat, Lean)
     }
+}
 
-    #[inline]
-    fn unpack(fat: usize, _: Lean) -> (usize, usize) {
-        (fat & MASK_LO, (fat & MASK_HI) >> 32)
-    }
+crate::cfg_fix! {
+    #[cfg(feature = "const_deref")] {
+        impl const Capacity for Lean {
+            type Field = Lean;
+            type NonZero = Lean;
 
-    #[inline]
-    fn maybe(fat: usize, _: Lean) -> Option<Lean> {
-        if fat & MASK_HI != 0 {
-            Some(Lean)
-        } else {
-            None
+            #[inline]
+            fn len(fat: usize) -> usize {
+                fat & MASK_LO
+            }
+
+            #[inline]
+            fn empty(len: usize) -> (usize, Lean) {
+                (len & MASK_LO, Lean)
+            }
+
+            #[inline]
+            fn store(len: usize, capacity: usize) -> (usize, Lean) {
+                if capacity & MASK_HI != 0 {
+                    panic!("beef::lean::Cow: Capacity out of bounds");
+                }
+
+                let fat = ((capacity & MASK_LO) << 32) | (len & MASK_LO);
+
+                (fat, Lean)
+            }
+
+            #[inline]
+            fn unpack(fat: usize, _: Lean) -> (usize, usize) {
+                (fat & MASK_LO, (fat & MASK_HI) >> 32)
+            }
+
+            #[inline]
+            fn maybe(fat: usize, _: Lean) -> Option<Lean> {
+                if fat & MASK_HI != 0 {
+                    Some(Lean)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
