@@ -351,57 +351,119 @@ where
     }
 }
 
-impl<'a, T, U> Default for Cow<'a, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-    &'a T: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        Cow::borrowed(Default::default())
+crate::cfg_fix! {
+    #[cfg(not(feature = "const_deref"))] {
+        impl<'a, T, U> Default for Cow<'a, T, U>
+        where
+            T: Beef + ?Sized,
+            U: Capacity,
+            &'a T: Default,
+        {
+            #[inline]
+            fn default() -> Self {
+                Cow::borrowed(Default::default())
+            }
+        }
+
+        impl<T, U> Eq for Cow<'_, T, U>
+        where
+            T: Eq + Beef + ?Sized,
+            U: Capacity,
+        {
+        }
+
+        impl<A, B, U, V> PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
+        where
+            A: Beef + ?Sized + PartialOrd<B>,
+            B: Beef + ?Sized,
+            U: Capacity,
+            V: Capacity,
+        {
+            #[inline]
+            fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
+                PartialOrd::partial_cmp(self.borrow(), other.borrow())
+            }
+        }
+
+        impl<T, U> Ord for Cow<'_, T, U>
+        where
+            T: Ord + Beef + ?Sized,
+            U: Capacity,
+        {
+            #[inline]
+            fn cmp(&self, other: &Self) -> Ordering {
+                Ord::cmp(self.borrow(), other.borrow())
+            }
+        }
+
+        impl<'a, T, U> From<&'a T> for Cow<'a, T, U>
+        where
+            T: Beef + ?Sized,
+            U: Capacity,
+        {
+            #[inline]
+            fn from(val: &'a T) -> Self {
+                Cow::borrowed(val)
+            }
+        }
     }
 }
 
-impl<T, U> Eq for Cow<'_, T, U>
-where
-    T: Eq + Beef + ?Sized,
-    U: Capacity,
-{
-}
+crate::cfg_fix! {
+    #[cfg(feature = "const_deref")] {
+        impl<'a, T, U> const Default for Cow<'a, T, U>
+        where
+            T: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+            &'a T: Default + ~const Default,
+        {
+            #[inline]
+            fn default() -> Self {
+                Cow::borrowed(Default::default())
+            }
+        }
 
-impl<A, B, U, V> PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
-where
-    A: Beef + ?Sized + PartialOrd<B>,
-    B: Beef + ?Sized,
-    U: Capacity,
-    V: Capacity,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
-        PartialOrd::partial_cmp(self.borrow(), other.borrow())
-    }
-}
+        impl<T, U> const Eq for Cow<'_, T, U>
+        where
+            T: Eq + Beef + ?Sized,
+            U: Capacity,
+        {
+        }
 
-impl<T, U> Ord for Cow<'_, T, U>
-where
-    T: Ord + Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn cmp(&self, other: &Self) -> Ordering {
-        Ord::cmp(self.borrow(), other.borrow())
-    }
-}
+        impl<A, B, U, V> const PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
+        where
+            A: Beef + ?Sized + ~const Steak + ~const PartialOrd<B>,
+            B: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+            V: Capacity,
+        {
+            #[inline]
+            fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
+                PartialOrd::partial_cmp(self.borrow(), other.borrow())
+            }
+        }
 
-impl<'a, T, U> From<&'a T> for Cow<'a, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn from(val: &'a T) -> Self {
-        Cow::borrowed(val)
+        impl<T, U> const Ord for Cow<'_, T, U>
+        where
+            T: ~const Ord + Beef + ?Sized + ~const Steak,
+            U: Capacity,
+        {
+            #[inline]
+            fn cmp(&self, other: &Self) -> Ordering {
+                Ord::cmp(self.borrow(), other.borrow())
+            }
+        }
+
+        impl<'a, T, U> const From<&'a T> for Cow<'a, T, U>
+        where
+            T: Beef + ?Sized + ~const Steak,
+            U: Capacity,
+        {
+            #[inline]
+            fn from(val: &'a T) -> Self {
+                Cow::borrowed(val)
+            }
+        }
     }
 }
 
