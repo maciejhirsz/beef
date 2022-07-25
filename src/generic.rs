@@ -67,18 +67,7 @@ where
     T: Beef + ?Sized,
     U: Capacity,
 {
-    #[cfg(feature = "const_deref")]
     const fn borrowed_from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
-        Cow {
-            ptr,
-            fat,
-            cap,
-            marker: PhantomData,
-        }
-    }
-
-    #[cfg(not(feature = "const_deref"))]
-    fn borrowed_from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
         Cow {
             ptr,
             fat,
