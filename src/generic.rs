@@ -325,7 +325,7 @@ crate::cfg_const_deref! {
     where
         T: Beef + ?Sized + ~const Steak,
         U: Capacity,
-        &'a T: Default + ~const Default,
+        &'a T: ~const Default,
     {
         #[inline]
         fn default() -> Self {
