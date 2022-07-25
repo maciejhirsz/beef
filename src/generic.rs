@@ -68,7 +68,7 @@ where
     U: Capacity,
 {
     #[cfg(feature = "const_deref")]
-    const fn borrowed_from_raw_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
+    const fn borrowed_from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
         Cow {
             ptr,
             fat,
@@ -78,7 +78,7 @@ where
     }
 
     #[cfg(not(feature = "const_deref"))]
-    fn borrowed_from_raw_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
+    fn borrowed_from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
         Cow {
             ptr,
             fat,
@@ -106,7 +106,7 @@ where
             T: ~const Steak
         {
             let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
-            Self::borrowed_from_raw_parts(ptr, fat, cap)
+            Self::borrowed_from_parts(ptr, fat, cap)
         }
     }
 
