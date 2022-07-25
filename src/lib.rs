@@ -52,9 +52,9 @@ pub mod generic;
 #[cfg(target_pointer_width = "64")]
 pub mod lean;
 
-pub(crate) mod cfg_fix;
+pub(crate) mod cfg_const_deref;
 
-pub(crate) use cfg_fix::cfg_fix;
+pub(crate) use cfg_const_deref::{cfg_const_deref, cfg_const_deref_munch};
 
 #[cfg(not(target_pointer_width = "64"))]
 pub mod lean {
@@ -257,6 +257,7 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
+        #[allow(deprecated)]
         fn const_fn_str() {
             const HELLO: Cow<str> = Cow::const_str("Hello");
 
@@ -265,6 +266,7 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
 
         #[test]
         #[cfg(feature = "const_fn")]
+        #[allow(deprecated)]
         fn const_fn_slice() {
             const FOO: Cow<[u8]> = Cow::const_slice(b"bar");
 
@@ -279,7 +281,6 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         
             assert_eq!(BAR, b"bar");
         }
-
 
         #[test]
         fn default_str() {

@@ -67,57 +67,46 @@ where
     T: Beef + ?Sized,
     U: Capacity,
 {
-    crate::cfg_fix! {
-        #[cfg(not(feature = "const_deref"))] {
-            /// Borrowed data.
-            ///
-            /// # Example
-            ///
-            /// ```rust
-            /// use beef::Cow;
-            ///
-            /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
-            /// ```
-            ///
-            #[inline]
-            pub fn borrowed(val: &'a T) -> Self {
-                let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
-
-                Cow {
-                    ptr,
-                    fat,
-                    cap,
-                    marker: PhantomData,
-                }
-            }
+    #[cfg(feature = "const_deref")]
+    const fn borrowed_from_raw_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
         }
     }
 
-    crate::cfg_fix! {
-        #[cfg(feature = "const_deref")] {
-            /// Borrowed data.
-            ///
-            /// # Example
-            ///
-            /// ```rust
-            /// use beef::Cow;
-            ///
-            /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
-            /// ```
-            ///
-            #[inline]
-            pub const fn borrowed(val: &'a T) -> Self
-            where T: ~const Steak
-            {
-                let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
+    #[cfg(not(feature = "const_deref"))]
+    fn borrowed_from_raw_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
+        Cow {
+            ptr,
+            fat,
+            cap,
+            marker: PhantomData,
+        }
+    }
 
-                Cow {
-                    ptr,
-                    fat,
-                    cap,
-                    marker: PhantomData,
-                }
-            }
+    // fixme: required `borrowed_from_raw_parts` - it has bug with the processing of structs
+    //  for example with: `Cow { ptr, fat, cap, marker }`
+    crate::cfg_const_deref! {
+        /// Borrowed data.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// use beef::Cow;
+        ///
+        /// let borrowed: Cow<str> = Cow::borrowed("I'm just a borrow");
+        /// ```
+        ///
+        #[inline]
+        pub const fn borrowed(val: &'a T) -> Self
+        where
+            T: ~const Steak
+        {
+            let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
+            Self::borrowed_from_raw_parts(ptr, fat, cap)
         }
     }
 
@@ -185,23 +174,11 @@ where
         self.capacity().is_some()
     }
 
-    crate::cfg_fix! {
-        #[cfg(not(feature = "const_deref"))] {
-            /// Internal convenience method for casting `ptr` into a `&T`
-            #[inline]
-            fn borrow(&self) -> &T {
-                unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
-            }
-        }
-    }
-
-    crate::cfg_fix! {
-        #[cfg(feature = "const_deref")] {
-            /// Internal convenience method for casting `ptr` into a `&T`
-            #[inline]
-            const fn borrow(&self) -> &T where T: ~const Steak {
-                unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
-            }
+    crate::cfg_const_deref! {
+        /// Internal convenience method for casting `ptr` into a `&T`
+        #[inline]
+        const fn borrow(&self) -> &T where T: ~const Steak {
+            unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
         }
     }
 
@@ -351,118 +328,66 @@ where
     }
 }
 
-crate::cfg_fix! {
-    #[cfg(not(feature = "const_deref"))] {
-        impl<'a, T, U> Default for Cow<'a, T, U>
-        where
-            T: Beef + ?Sized,
-            U: Capacity,
-            &'a T: Default,
-        {
-            #[inline]
-            fn default() -> Self {
-                Cow::borrowed(Default::default())
-            }
-        }
-
-        impl<T, U> Eq for Cow<'_, T, U>
-        where
-            T: Eq + Beef + ?Sized,
-            U: Capacity,
-        {
-        }
-
-        impl<A, B, U, V> PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
-        where
-            A: Beef + ?Sized + PartialOrd<B>,
-            B: Beef + ?Sized,
-            U: Capacity,
-            V: Capacity,
-        {
-            #[inline]
-            fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
-                PartialOrd::partial_cmp(self.borrow(), other.borrow())
-            }
-        }
-
-        impl<T, U> Ord for Cow<'_, T, U>
-        where
-            T: Ord + Beef + ?Sized,
-            U: Capacity,
-        {
-            #[inline]
-            fn cmp(&self, other: &Self) -> Ordering {
-                Ord::cmp(self.borrow(), other.borrow())
-            }
-        }
-
-        impl<'a, T, U> From<&'a T> for Cow<'a, T, U>
-        where
-            T: Beef + ?Sized,
-            U: Capacity,
-        {
-            #[inline]
-            fn from(val: &'a T) -> Self {
-                Cow::borrowed(val)
-            }
+crate::cfg_const_deref! {
+    impl<'a, T, U> const Default for Cow<'a, T, U>
+    where
+        T: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+        &'a T: Default + ~const Default,
+    {
+        #[inline]
+        fn default() -> Self {
+            Cow::borrowed(Default::default())
         }
     }
 }
 
-crate::cfg_fix! {
-    #[cfg(feature = "const_deref")] {
-        impl<'a, T, U> const Default for Cow<'a, T, U>
-        where
-            T: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-            &'a T: Default + ~const Default,
-        {
-            #[inline]
-            fn default() -> Self {
-                Cow::borrowed(Default::default())
-            }
-        }
+crate::cfg_const_deref! {
+    impl<T, U> const Eq for Cow<'_, T, U>
+    where
+        T: Eq + Beef + ?Sized,
+        U: Capacity,
+    {
+    }
+}
 
-        impl<T, U> const Eq for Cow<'_, T, U>
-        where
-            T: Eq + Beef + ?Sized,
-            U: Capacity,
-        {
+crate::cfg_const_deref! {
+    impl<A, B, U, V> const PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
+    where
+        A: Beef + ?Sized + ~const Steak + ~const PartialOrd<B>,
+        B: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+        V: Capacity,
+    {
+        #[inline]
+        fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
+            PartialOrd::partial_cmp(self.borrow(), other.borrow())
         }
+    }
+}
 
-        impl<A, B, U, V> const PartialOrd<Cow<'_, B, V>> for Cow<'_, A, U>
-        where
-            A: Beef + ?Sized + ~const Steak + ~const PartialOrd<B>,
-            B: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-            V: Capacity,
-        {
-            #[inline]
-            fn partial_cmp(&self, other: &Cow<'_, B, V>) -> Option<Ordering> {
-                PartialOrd::partial_cmp(self.borrow(), other.borrow())
-            }
+crate::cfg_const_deref! {
+    impl<T, U> const Ord for Cow<'_, T, U>
+    where
+        T: ~const Ord + Beef + ?Sized + ~const Steak,
+        U: Capacity,
+    {
+        #[inline]
+        fn cmp(&self, other: &Self) -> Ordering {
+            Ord::cmp(self.borrow(), other.borrow())
         }
+    }
+}
 
-        impl<T, U> const Ord for Cow<'_, T, U>
-        where
-            T: ~const Ord + Beef + ?Sized + ~const Steak,
-            U: Capacity,
-        {
-            #[inline]
-            fn cmp(&self, other: &Self) -> Ordering {
-                Ord::cmp(self.borrow(), other.borrow())
-            }
-        }
-
-        impl<'a, T, U> const From<&'a T> for Cow<'a, T, U>
-        where
-            T: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-        {
-            #[inline]
-            fn from(val: &'a T) -> Self {
-                Cow::borrowed(val)
-            }
+crate::cfg_const_deref! {
+    impl<'a, T, U> const From<&'a T> for Cow<'a, T, U>
+    where
+        T: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+    {
+        #[inline]
+        fn from(val: &'a T) -> Self {
+            Cow::borrowed(val)
         }
     }
 }
@@ -515,107 +440,59 @@ where
     }
 }
 
-crate::cfg_fix! {
-    #[cfg(not(feature = "const_deref"))] {
-        impl<T, U> core::ops::Deref for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized,
-            U: Capacity,
-        {
-            type Target = T;
+crate::cfg_const_deref! {
+    impl<T, U> const core::ops::Deref for Cow<'_, T, U>
+    where
+        T: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+    {
+        type Target = T;
 
-            #[inline]
-            fn deref(&self) -> &T {
-                self.borrow()
-            }
-        }
-
-        impl<T, U> AsRef<T> for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized,
-            U: Capacity,
-        {
-            #[inline]
-            fn as_ref(&self) -> &T {
-                self.borrow()
-            }
-        }
-
-        impl<T, U> Borrow<T> for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized,
-            U: Capacity,
-        {
-            #[inline]
-            fn borrow(&self) -> &T {
-                self.borrow()
-            }
-        }
-
-        impl<A, B, U, V> PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
-        where
-            A: Beef + ?Sized,
-            B: Beef + ?Sized,
-            U: Capacity,
-            V: Capacity,
-            A: PartialEq<B>,
-        {
-            fn eq(&self, other: &Cow<B, V>) -> bool {
-                self.borrow() == other.borrow()
-            }
+        #[inline]
+        fn deref(&self) -> &T {
+            self.borrow()
         }
     }
 }
 
-crate::cfg_fix! {
-    #[cfg(feature = "const_deref")] {
-        impl<T, U> const core::ops::Deref for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-        {
-            type Target = T;
-
-            #[inline]
-            fn deref(&self) -> &T {
-                self.borrow()
-            }
+crate::cfg_const_deref! {
+    impl<T, U> const AsRef<T> for Cow<'_, T, U>
+    where
+        T: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+    {
+        #[inline]
+        fn as_ref(&self) -> &T {
+            self.borrow()
         }
+    }
+}
 
-        impl<T, U> const AsRef<T> for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-        {
-            #[inline]
-            fn as_ref(&self) -> &T {
-                self.borrow()
-            }
+crate::cfg_const_deref! {
+    impl<T, U> const Borrow<T> for Cow<'_, T, U>
+    where
+        T: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+    {
+        #[inline]
+        fn borrow(&self) -> &T {
+            self.borrow()
         }
+    }
+}
 
-        impl<T, U> const Borrow<T> for Cow<'_, T, U>
-        where
-            T: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-        {
-            #[inline]
-            fn borrow(&self) -> &T {
-                self.borrow()
-            }
-        }
-
-        impl<A, B, U, V> const PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
-        where
-            A: Beef + ?Sized + ~const Steak,
-            B: Beef + ?Sized + ~const Steak,
-            U: Capacity,
-            V: Capacity,
-            A: ~const PartialEq<B>,
-        {
-            fn eq(&self, other: &Cow<B, V>) -> bool {
-                // fixme: compile error within `a == b` context :(
-                self.borrow().eq(other.borrow())
-            }
+crate::cfg_const_deref! {
+    impl<A, B, U, V> const PartialEq<Cow<'_, B, V>> for Cow<'_, A, U>
+    where
+        A: Beef + ?Sized + ~const Steak,
+        B: Beef + ?Sized + ~const Steak,
+        U: Capacity,
+        V: Capacity,
+        A: ~const PartialEq<B>,
+    {
+        fn eq(&self, other: &Cow<B, V>) -> bool {
+            // fixme: compile error within `a == b` context :(
+            self.borrow().eq(other.borrow())
         }
     }
 }
