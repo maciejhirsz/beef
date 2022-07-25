@@ -177,7 +177,10 @@ where
     crate::cfg_const_deref! {
         /// Internal convenience method for casting `ptr` into a `&T`
         #[inline]
-        const fn borrow(&self) -> &T where T: ~const Steak {
+        const fn borrow(&self) -> &T
+        where
+            T: ~const Steak
+        {
             unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
         }
     }
