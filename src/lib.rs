@@ -37,7 +37,11 @@
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
 #![cfg_attr(feature = "const_deref", feature(const_slice_from_raw_parts))]
+#![cfg_attr(feature = "const_deref", feature(const_refs_to_cell))]
+#![cfg_attr(feature = "const_deref", feature(const_eval_select))]
+#![cfg_attr(feature = "const_deref", feature(const_ptr_as_ref))]
 #![cfg_attr(feature = "const_deref", feature(const_trait_impl))]
+#![cfg_attr(feature = "const_deref", feature(const_convert))]
 #![cfg_attr(feature = "const_deref", feature(const_deref))]
 #![warn(missing_docs)]
 #![cfg_attr(not(test), no_std)]
@@ -281,6 +285,32 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
             const BAR: &[u8] = &*FOO;
         
             assert_eq!(BAR, b"bar");
+        }
+        
+        #[test]
+        #[cfg(feature = "const_deref")]
+        fn into_std_cow_vec() {
+            use alloc::borrow::Cow as StdCow;
+            
+            const COW: Cow<[u8]> = Cow::borrowed(b"hello");
+            const STD_COW1: StdCow<[u8]> = COW.into();
+            const STD_COW2: StdCow<[u8]> = StdCow::from(COW);
+        
+            assert!(matches!(STD_COW1, StdCow::Borrowed(b"hello")));
+            assert!(matches!(STD_COW2, StdCow::Borrowed(b"hello")));
+        }
+        
+        #[test]
+        #[cfg(feature = "const_deref")]
+        fn into_std_cow_str() {
+            use alloc::borrow::Cow as StdCow;
+            
+            const COW: Cow<str> = Cow::borrowed("hello");
+            const STD_COW1: StdCow<str> = COW.into();
+            const STD_COW2: StdCow<str> = StdCow::from(COW);
+        
+            assert!(matches!(STD_COW1, StdCow::Borrowed("hello")));
+            assert!(matches!(STD_COW2, StdCow::Borrowed("hello")));
         }
 
         #[test]

@@ -1,13 +1,17 @@
 //! This module contains the actual, albeit generic, implementaiton of the `Cow`,
 //! and the traits that are available to it.
 
-use alloc::borrow::{Borrow, Cow as StdCow};
+use alloc::borrow::{Borrow, Cow as StdCow, ToOwned};
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
+#[cfg(feature = "const_deref")]
+use core::marker::Destruct;
 use core::marker::PhantomData;
+#[cfg(not(feature = "const_deref"))]
+use core::marker::Sized as Destruct;
 use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
@@ -67,13 +71,19 @@ where
     T: Beef + ?Sized,
     U: Capacity,
 {
-    const fn borrowed_from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
+    // fixme: it should be unsafe :)
+    const fn from_parts(ptr: NonNull<T::PointerT>, fat: usize, cap: U::Field) -> Self {
         Cow {
             ptr,
             fat,
             cap,
             marker: PhantomData,
         }
+    }
+
+    const fn to_parts(&self) -> (NonNull<T::PointerT>, usize, U::Field) {
+        let Cow { ptr, fat, cap, .. } = self;
+        (*ptr, *fat, *cap)
     }
 
     // fixme: required `borrowed_from_raw_parts` - it has bug with the processing of structs
@@ -95,7 +105,7 @@ where
             T: ~const Steak
         {
             let (ptr, fat, cap) = T::ref_into_parts::<U>(val);
-            Self::borrowed_from_parts(ptr, fat, cap)
+            Self::from_parts(ptr, fat, cap)
         }
     }
 
@@ -112,55 +122,90 @@ where
         }
     }
 
-    /// Extracts borrowed data.
-    ///
-    /// Panics: If the data is owned.
-    #[inline]
-    pub fn unwrap_borrowed(self) -> &'a T {
-        if self.capacity().is_some() {
-            panic!("Can not turn owned beef::Cow into a borrowed value")
+    crate::cfg_const_deref! {
+        /// Extracts borrowed data if it is borrowed
+        #[inline]
+        pub const fn as_borrowed(&self) -> Option<&'_ T>
+        where
+            T: ~const Steak,
+            U: ~const Capacity,
+        {
+            if self.is_borrowed() {
+                Some(self.borrow())
+            } else {
+                None
+            }
         }
-        unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
     }
 
-    /// Returns `true` if data is borrowed or had no capacity.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use beef::Cow;
-    ///
-    /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
-    /// let no_capacity: Cow<str> = Cow::owned(String::new());
-    /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
-    ///
-    /// assert_eq!(borrowed.is_borrowed(), true);
-    /// assert_eq!(no_capacity.is_borrowed(), true);
-    /// assert_eq!(owned.is_borrowed(), false);
-    /// ```
-    #[inline]
-    pub fn is_borrowed(&self) -> bool {
-        self.capacity().is_none()
+    crate::cfg_const_deref! {
+        //crate::cfg_const_deref! {
+        /// Extracts borrowed data.
+        ///
+        /// Panics: If the data is owned.
+        #[inline]
+        pub const fn unwrap_borrowed(self) -> &'a T
+        where
+            T: ~const Steak,
+            U: ~const Capacity + 'a,
+            Self: ~const Destruct,
+        {
+            if self.is_borrowed() {
+                unsafe { &*T::ref_from_parts::<U>(self.ptr, self.fat) }
+            } else {
+                panic!("Can not turn owned beef::Cow into a borrowed value")
+            }
+        }
     }
 
-    /// Returns `true` if data is owned and has non-0 capacity.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use beef::Cow;
-    ///
-    /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
-    /// let no_capacity: Cow<str> = Cow::owned(String::new());
-    /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
-    ///
-    /// assert_eq!(borrowed.is_owned(), false);
-    /// assert_eq!(no_capacity.is_owned(), false);
-    /// assert_eq!(owned.is_owned(), true);
-    /// ```
-    #[inline]
-    pub fn is_owned(&self) -> bool {
-        self.capacity().is_some()
+    crate::cfg_const_deref! {
+        /// Returns `true` if data is borrowed or had no capacity.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// use beef::Cow;
+        ///
+        /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
+        /// let no_capacity: Cow<str> = Cow::owned(String::new());
+        /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
+        ///
+        /// assert_eq!(borrowed.is_borrowed(), true);
+        /// assert_eq!(no_capacity.is_borrowed(), true);
+        /// assert_eq!(owned.is_borrowed(), false);
+        /// ```
+        #[inline]
+        pub const fn is_borrowed(&self) -> bool
+        where
+            U: ~const Capacity,
+        {
+            self.capacity().is_none()
+        }
+    }
+
+    crate::cfg_const_deref! {
+        /// Returns `true` if data is owned and has non-0 capacity.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// use beef::Cow;
+        ///
+        /// let borrowed: Cow<str> = Cow::borrowed("Borrowed");
+        /// let no_capacity: Cow<str> = Cow::owned(String::new());
+        /// let owned: Cow<str> = Cow::owned(String::from("Owned"));
+        ///
+        /// assert_eq!(borrowed.is_owned(), false);
+        /// assert_eq!(no_capacity.is_owned(), false);
+        /// assert_eq!(owned.is_owned(), true);
+        /// ```
+        #[inline]
+        pub const fn is_owned(&self) -> bool
+        where
+            U: ~const Capacity,
+        {
+            self.capacity().is_some()
+        }
     }
 
     crate::cfg_const_deref! {
@@ -174,9 +219,170 @@ where
         }
     }
 
-    #[inline]
-    fn capacity(&self) -> Option<U::NonZero> {
-        U::maybe(self.fat, self.cap)
+    crate::cfg_const_deref! {
+        #[inline]
+        const fn capacity(&self) -> Option<U::NonZero>
+        where
+            U: ~const Capacity,
+        {
+            U::maybe(self.fat, self.cap)
+        }
+    }
+
+    #[allow(dead_code)]
+    fn std_into_parts<S, C>(cow: StdCow<S>) -> (NonNull<S::PointerT>, usize, C::Field)
+    where
+        S: Beef + ?Sized,
+        C: Capacity,
+    {
+        match cow {
+            StdCow::Borrowed(borrowed) => S::ref_into_parts::<C>(borrowed),
+            StdCow::Owned(owned) => S::owned_into_parts::<C>(owned),
+        }
+    }
+
+    crate::cfg_const_deref! {
+        #[allow(dead_code)]
+        const fn std_into_parts_const<'std, S, C>(
+            cow: StdCow<'std, S>,
+        ) -> (NonNull<S::PointerT>, usize, C::Field)
+        where
+            S: ~const Steak + Beef + ?Sized,
+            C: ~const Capacity,
+            StdCow<'std, S>: ~const Destruct,
+        {
+            if let StdCow::Borrowed(borrowed) = cow {
+                S::ref_into_parts::<C>(borrowed)
+            } else {
+                panic!("This message is useless: you can't create const `::owned`")
+            }
+        }
+    }
+
+    crate::cfg_const_deref! {
+        #[allow(dead_code)]
+        const fn ct_from_cow<'beef, S, C>(
+            ptr: NonNull<S::PointerT>,
+            fat: usize,
+            cap: C::Field,
+        ) -> Cow<'beef, S, C>
+        where
+            S: ~const Steak + Beef + ?Sized,
+            C: ~const Capacity,
+        {
+            if C::maybe(fat, cap).is_none() {
+                // SAFETY: later infer lifetime from `'a` but in this place
+                // generic params can't use
+                Cow::from_parts(ptr, fat, cap)
+            } else {
+                panic!("This message is useless: you can't create const `::owned`")
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn rt_from_cow<'beef, S, C>(
+        ptr: NonNull<S::PointerT>,
+        fat: usize,
+        cap: C::Field,
+    ) -> Cow<'beef, S, C>
+    where
+        S: Steak + Beef + ?Sized,
+        C: Capacity,
+    {
+        Cow::from_parts(ptr, fat, cap)
+    }
+
+    crate::cfg_const_deref! {
+        #[inline]
+        const fn from_std_cow(cow: StdCow<'a, T>) -> Cow<'a, T, U>
+        where
+            T: ~const Steak,
+            U: ~const Capacity,
+            StdCow<'a, T>: ~const Destruct,
+        {
+            #[cfg(not(feature = "const_deref"))]
+            {
+                // feature :(
+                // rt_from_cow.call_once(std_into_parts(cow))
+
+                let (ptr, fat, cap) = Self::std_into_parts::<T, U>(cow);
+                Self::rt_from_cow(ptr, fat, cap)
+            }
+
+            // SAFETY: `ct` and `rt` must behave observably equivalent
+            //      rt      |      rt
+            // `::borrowed` | `::borrowed`
+            //  `::owned`   | compile error
+            // I think it is equivalent
+            #[cfg(feature = "const_deref")]
+            unsafe {
+                core::intrinsics::const_eval_select(
+                    Self::std_into_parts_const::<T, U>(cow),
+                    Self::ct_from_cow::<T, U>,
+                    Self::rt_from_cow::<T, U>,
+                )
+            }
+        }
+    }
+
+    crate::cfg_const_deref! {
+        #[inline]
+        const fn into_std_cow(self) -> StdCow<'a, T>
+        where
+            T: ~const Steak,
+            U: ~const Capacity,
+        {
+            #[allow(dead_code)]
+            const fn ct_into_cow<'cow, S: Beef + ?Sized, C: Capacity>(
+                ptr: NonNull<S::PointerT>,
+                fat: usize,
+                cap: C::Field,
+            ) -> StdCow<'cow, S>
+            where
+                S: ~const Steak,
+                C: ~const Capacity,
+            {
+                // fixme: at `match` `cfg_const_deref` is not work
+                if C::maybe(fat, cap).is_none() {
+                    StdCow::Borrowed(unsafe { &*S::ref_from_parts::<C>(ptr, fat) })
+                } else {
+                    panic!("This message is useless: you can't create const `::owned`")
+                }
+            }
+
+            fn rt_into_cow<'cow, S: Beef + ?Sized, C: Capacity>(
+                ptr: NonNull<S::PointerT>,
+                fat: usize,
+                cap: C::Field,
+            ) -> StdCow<'cow, S> {
+                if let Some(capacity) = C::maybe(fat, cap) {
+                    StdCow::Owned(unsafe { S::owned_from_parts::<C>(ptr, fat, capacity) })
+                } else {
+                    StdCow::Borrowed(unsafe { &*S::ref_from_parts::<C>(ptr, fat) })
+                }
+            }
+
+            #[cfg(not(feature = "const_deref"))]
+            {
+                let (ptr, fat, cap) = self.to_parts();
+                rt_into_cow::<T, U>(ptr, fat, cap)
+            }
+
+            // SAFETY: `ct` and `rt` must behave observably equivalent
+            //      rt      |      rt
+            // `::borrowed` | `::borrowed`
+            //  `::owned`   | compile error
+            // I think it is equivalent
+            #[cfg(feature = "const_deref")]
+            unsafe {
+                core::intrinsics::const_eval_select(
+                    ManuallyDrop::new(self).to_parts(),
+                    ct_into_cow::<T, U>,
+                    rt_into_cow::<T, U>,
+                )
+            }
+        }
     }
 }
 
@@ -489,34 +695,37 @@ crate::cfg_const_deref! {
     }
 }
 
-impl<'a, T, U> From<StdCow<'a, T>> for Cow<'a, T, U>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn from(stdcow: StdCow<'a, T>) -> Self {
-        match stdcow {
-            StdCow::Borrowed(v) => Self::borrowed(v),
-            StdCow::Owned(v) => Self::owned(v),
+crate::cfg_const_deref! {
+    impl<'a, T, U> const From<StdCow<'a, T>> for Cow<'a, T, U>
+    where
+        T: Beef + ?Sized,
+        U: Capacity,
+    {
+        #[inline]
+        fn from(stdcow: StdCow<'a, T>) -> Self
+        where
+            T: ~const Steak,
+            U: ~const Capacity,
+            <T as ToOwned>::Owned: ~const Destruct
+        {
+            Cow::from_std_cow(stdcow)
         }
     }
 }
 
-impl<'a, T, U> From<Cow<'a, T, U>> for StdCow<'a, T>
-where
-    T: Beef + ?Sized,
-    U: Capacity,
-{
-    #[inline]
-    fn from(cow: Cow<'a, T, U>) -> Self {
-        let cow = ManuallyDrop::new(cow);
-
-        match cow.capacity() {
-            Some(capacity) => {
-                StdCow::Owned(unsafe { T::owned_from_parts::<U>(cow.ptr, cow.fat, capacity) })
-            }
-            None => StdCow::Borrowed(unsafe { &*T::ref_from_parts::<U>(cow.ptr, cow.fat) }),
+crate::cfg_const_deref! {
+    impl<'a, T, U> const From<Cow<'a, T, U>> for StdCow<'a, T>
+    where
+        T: Beef + ?Sized,
+        U: Capacity,
+    {
+        #[inline]
+        fn from(cow: Cow<'a, T, U>) -> Self
+        where
+            T: ~const Steak,
+            U: ~const Capacity,
+        {
+            cow.into_std_cow()
         }
     }
 }
