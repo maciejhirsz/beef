@@ -11,32 +11,34 @@ pub(crate) mod internal {
 }
 use internal::Wide;
 
-impl Capacity for Wide {
-    type Field = Option<NonZeroUsize>;
-    type NonZero = NonZeroUsize;
+crate::cfg_const_deref! {
+    impl const Capacity for Wide {
+        type Field = Option<NonZeroUsize>;
+        type NonZero = NonZeroUsize;
 
-    #[inline]
-    fn len(fat: usize) -> usize {
-        fat
-    }
+        #[inline]
+        fn len(fat: usize) -> usize {
+            fat
+        }
 
-    #[inline]
-    fn empty(len: usize) -> (usize, Self::Field) {
-        (len, None)
-    }
+        #[inline]
+        fn empty(len: usize) -> (usize, Self::Field) {
+            (len, None)
+        }
 
-    #[inline]
-    fn store(len: usize, capacity: usize) -> (usize, Self::Field) {
-        (len, NonZeroUsize::new(capacity))
-    }
+        #[inline]
+        fn store(len: usize, capacity: usize) -> (usize, Self::Field) {
+            (len, NonZeroUsize::new(capacity))
+        }
 
-    #[inline]
-    fn unpack(fat: usize, capacity: NonZeroUsize) -> (usize, usize) {
-        (fat, capacity.get())
-    }
+        #[inline]
+        fn unpack(fat: usize, capacity: NonZeroUsize) -> (usize, usize) {
+            (fat, capacity.get())
+        }
 
-    #[inline]
-    fn maybe(_: usize, capacity: Option<NonZeroUsize>) -> Option<NonZeroUsize> {
-        capacity
+        #[inline]
+        fn maybe(_: usize, capacity: Option<NonZeroUsize>) -> Option<NonZeroUsize> {
+            capacity
+        }
     }
 }

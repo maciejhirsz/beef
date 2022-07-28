@@ -36,6 +36,11 @@
 //! assert_eq!(size_of::<beef::lean::Cow<str>>(), 2 * WORD);
 //! ```
 #![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
+#![cfg_attr(feature = "const_deref", feature(const_slice_from_raw_parts))]
+#![cfg_attr(feature = "const_deref", feature(const_refs_to_cell))]
+#![cfg_attr(feature = "const_deref", feature(const_trait_impl))]
+#![cfg_attr(feature = "const_deref", feature(const_deref))]
+#![cfg_attr(all(feature = "const_deref", test), feature(const_option))]
 #![warn(missing_docs)]
 #![cfg_attr(not(test), no_std)]
 extern crate alloc;
@@ -49,6 +54,10 @@ mod serde;
 pub mod generic;
 #[cfg(target_pointer_width = "64")]
 pub mod lean;
+
+pub(crate) mod cfg_const_deref;
+
+pub(crate) use cfg_const_deref::{cfg_const_deref, cfg_const_deref_munch};
 
 #[cfg(not(target_pointer_width = "64"))]
 pub mod lean {
@@ -251,6 +260,7 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
         }
 
         #[test]
+        #[allow(deprecated)]
         fn const_fn_str() {
             const HELLO: Cow<str> = Cow::const_str("Hello");
 
@@ -259,10 +269,32 @@ macro_rules! test { ($tmod:ident => $cow:path) => {
 
         #[test]
         #[cfg(feature = "const_fn")]
+        #[allow(deprecated)]
         fn const_fn_slice() {
             const FOO: Cow<[u8]> = Cow::const_slice(b"bar");
 
             assert_eq!(&*FOO, b"bar");
+        }
+        
+        #[test]
+        #[cfg(feature = "const_deref")]
+        fn real_const_fn_slice() {
+            const FOO: Cow<[u8]> = Cow::borrowed(b"bar");
+            const BAR: &[u8] = &*FOO;
+        
+            assert_eq!(BAR, b"bar");
+        }
+        
+        #[test]
+        #[cfg(feature = "const_deref")]
+        fn into_const_std_cow() {
+            use alloc::borrow::Cow as StdCow;
+        
+            const COW: Cow<str> = Cow::borrowed("hello");
+            const STR: &str = &*COW;
+            const STD_COW: StdCow<str> = StdCow::Borrowed(STR);
+        
+            assert!(matches!(STD_COW, StdCow::Borrowed("hello")));
         }
 
         #[test]
