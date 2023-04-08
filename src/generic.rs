@@ -13,7 +13,7 @@ use core::ptr::NonNull;
 
 #[cfg(target_pointer_width = "64")]
 use crate::lean::internal::Lean;
-use crate::traits::{Beef, Capacity};
+pub use crate::traits::{Beef, Capacity};
 use crate::wide::internal::Wide;
 
 /// A clone-on-write smart pointer, mostly compatible with [`std::borrow::Cow`](https://doc.rust-lang.org/std/borrow/enum.Cow.html).

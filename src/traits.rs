@@ -1,14 +1,25 @@
-pub(crate) use internal::Beef;
-pub(crate) use internal::Capacity;
+use crate::lean::internal::Lean;
+use crate::wide::internal::Wide;
+pub(crate) use internal::InternalBeef;
+pub(crate) use internal::InternalCapacity;
+
+pub trait Beef: InternalBeef {}
+impl<T: Clone> Beef for [T] {}
+impl Beef for str {}
+
+pub trait Capacity: InternalCapacity {}
+impl Capacity for Lean {}
+impl Capacity for Wide {}
 
 pub(crate) mod internal {
+    use crate::generic::Capacity;
     use alloc::borrow::ToOwned;
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::mem::ManuallyDrop;
     use core::ptr::{slice_from_raw_parts, NonNull};
 
-    pub trait Capacity {
+    pub trait InternalCapacity {
         type Field: Copy;
         type NonZero: Copy;
 
@@ -31,7 +42,7 @@ pub(crate) mod internal {
     /// + `T::Owned` has a `capacity`, which is an extra word that is absent in `T`.
     /// + `T::Owned` with `capacity` of `0` does not allocate memory.
     /// + `T::Owned` can be reconstructed from `*mut T` borrowed out of it, plus capacity.
-    pub unsafe trait Beef: ToOwned {
+    pub unsafe trait InternalBeef: ToOwned {
         type PointerT;
 
         fn ref_into_parts<U>(&self) -> (NonNull<Self::PointerT>, usize, U::Field)
@@ -59,7 +70,7 @@ pub(crate) mod internal {
             U: Capacity;
     }
 
-    unsafe impl Beef for str {
+    unsafe impl InternalBeef for str {
         type PointerT = u8;
 
         #[inline]
@@ -117,7 +128,7 @@ pub(crate) mod internal {
         }
     }
 
-    unsafe impl<T: Clone> Beef for [T] {
+    unsafe impl<T: Clone> InternalBeef for [T] {
         type PointerT = T;
 
         #[inline]

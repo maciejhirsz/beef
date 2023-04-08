@@ -1,4 +1,4 @@
-use crate::traits::Capacity;
+use crate::traits::InternalCapacity;
 use core::num::NonZeroUsize;
 
 /// Compact three word `Cow` that puts the ownership tag in capacity.
@@ -11,7 +11,7 @@ pub(crate) mod internal {
 }
 use internal::Wide;
 
-impl Capacity for Wide {
+impl InternalCapacity for Wide {
     type Field = Option<NonZeroUsize>;
     type NonZero = NonZeroUsize;
 

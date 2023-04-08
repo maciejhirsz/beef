@@ -1,6 +1,6 @@
 //! Namespace containing the 2-word `Cow` implementation.
 
-use crate::traits::Capacity;
+use crate::traits::InternalCapacity;
 
 /// Faster, 2-word `Cow`. This version is available only on 64-bit architecture,
 /// and it puts both capacity and length together in a fat pointer. Both length and capacity
@@ -28,7 +28,7 @@ impl Lean {
     }
 }
 
-impl Capacity for Lean {
+impl InternalCapacity for Lean {
     type Field = Lean;
     type NonZero = Lean;
 
