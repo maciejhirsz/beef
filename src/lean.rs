@@ -2,14 +2,17 @@
 
 use crate::traits::InternalCapacity;
 
-/// Faster, 2-word `Cow`. This version is available only on 64-bit architecture,
-/// and it puts both capacity and length together in a fat pointer. Both length and capacity
-/// is limited to 32 bits.
+/// Faster, 2-word `Cow`.
+///
+/// This version puts both capacity and length together in a fat pointer.
+/// Both length and capacity are stored evenly through out the target pointer's width.
+///
+/// For example, on a machine with a pointer width of 64. both length and capacity would occupy 32 bits.
 ///
 /// # Panics
 ///
-/// [`Cow::owned`](../generic/struct.Cow.html#method.owned) will panic if capacity is larger than `u32::max_size()`. Use the
-/// top level `beef::Cow` if you wish to avoid this problem.
+/// [`Cow::owned`](../generic/struct.Cow.html#method.owned) will panic if capacity is larger than half the pointer width.
+/// Use the top level `beef::Cow` if you wish to avoid this problem.
 pub type Cow<'a, T> = crate::generic::Cow<'a, T, Lean>;
 
 pub(crate) mod internal {
@@ -18,7 +21,8 @@ pub(crate) mod internal {
 }
 use internal::Lean;
 
-const MASK_LO: usize = u32::MAX as usize;
+const POINTER_SIZE: usize = core::mem::size_of::<usize>() * 8;
+const MASK_LO: usize = usize::MAX >> (POINTER_SIZE / 2);
 const MASK_HI: usize = !MASK_LO;
 
 impl Lean {

@@ -47,14 +47,7 @@ mod wide;
 mod serde;
 
 pub mod generic;
-#[cfg(target_pointer_width = "64")]
 pub mod lean;
-
-#[cfg(not(target_pointer_width = "64"))]
-pub mod lean {
-    /// Re-exports 3-word Cow for non-64-bit targets
-    pub use super::wide::Cow;
-}
 
 pub use wide::Cow;
 
